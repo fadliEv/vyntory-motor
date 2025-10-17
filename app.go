@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 type App struct {
@@ -54,7 +56,28 @@ type Response struct {
 // Database initialization
 func (a *App) initDatabase() error {
 	var err error
-	a.db, err = sql.Open("sqlite3", "./dealer_motor.db")
+
+	// Get the working directory and construct database path
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	// Try to find dealer_motor.db in the current working directory
+	dbPath := filepath.Join(wd, "dealer_motor.db")
+
+	// If not found in cwd, check parent directory (for when running from build/bin/)
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		parentDir := filepath.Dir(wd)
+		altDbPath := filepath.Join(parentDir, "dealer_motor.db")
+		if _, err := os.Stat(altDbPath); err == nil {
+			dbPath = altDbPath
+		}
+	}
+
+	fmt.Printf("📁 Using database path: %s\n", dbPath)
+
+	a.db, err = sql.Open("sqlite", dbPath)
 	if err != nil {
 		return err
 	}

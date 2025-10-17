@@ -1,0 +1,134 @@
+.sidebar {
+  width: 256px;
+  background-color: #344F1F;
+  color: #F9F5F0;
+  height: 100vh;
+  overflow-y: auto;
+  position: fixed;
+  left: 0;
+  top: 0;
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  z-index: 40;
+  transition: transform 0.3s ease;
+}
+
+.sidebar.open {
+  transform: translateX(0);
+}
+
+.sidebar.closed {
+  transform: translateX(-100%);
+}
+
+@media (min-width: 1024px) {
+  .sidebar {
+    transform: translateX(0) !important;
+  }
+}
+
+.sidebar-header {
+  padding: 24px;
+  border-bottom: 1px solid #B8610A;
+}
+
+.sidebar-logo-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-logo-icon {
+  width: 40px;
+  height: 40px;
+  background-color: #F4991A;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-logo-text h1 {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0;
+}
+
+.sidebar-logo-text p {
+  font-size: 12px;
+  color: rgba(249, 245, 240, 0.6);
+  margin: 0;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 16px;
+}
+
+.sidebar-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: none;
+  background-color: transparent;
+  color: #F9F5F0;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.sidebar-menu-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-menu-item.active {
+  background-color: #F4991A;
+  color: white;
+  box-shadow: 0 4px 6px rgba(244, 153, 26, 0.3);
+}
+
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid #B8610A;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-footer-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  color: #F9F5F0;
+}
+
+.sidebar-footer-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-footer-btn.logout {
+  color: #ff4444;
+}
+
+.sidebar-footer-btn.logout:hover {
+  background-color: rgba(255, 68, 68, 0.1);
+}
