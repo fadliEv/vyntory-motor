@@ -82,13 +82,39 @@ func (a *App) initDatabase() error {
 		return err
 	}
 
-	// Create motors table saja
+	// Check if table exists and needs migration
+	tableExists := false
+	var checkTable string
+	err = a.db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='motors'").Scan(&checkTable)
+	if err == nil {
+		tableExists = true
+	}
+
+	// If table exists with old schema, drop it and recreate
+	if tableExists {
+		// Check if old constraint exists by trying to insert with new status
+		var count int
+		err := a.db.QueryRow("SELECT COUNT(*) FROM motors WHERE status = 'baru_masuk'").Scan(&count)
+
+		// If we can query baru_masuk status, schema is already updated
+		if err == nil {
+			fmt.Println("✅ Database schema is already updated")
+			return nil
+		}
+
+		// Schema is old, need to migrate
+		fmt.Println("🔄 Migrating database schema from old format...")
+		a.db.Exec("DROP TABLE IF EXISTS motors")
+		tableExists = false
+	}
+
+	// Create motors table dengan schema baru
 	createTableSQL := `
 	CREATE TABLE IF NOT EXISTS motors (
 		id TEXT PRIMARY KEY,
 		nama_motor TEXT NOT NULL,
 		nomor_polisi TEXT UNIQUE NOT NULL,
-		status TEXT NOT NULL CHECK(status IN ('tersedia', 'terjual', 'dalam_perbaikan')),
+		status TEXT NOT NULL CHECK(status IN ('baru_masuk', 'tersedia', 'terjual', 'dalam_perbaikan')),
 		harga REAL NOT NULL,
 		tanggal_masuk DATE NOT NULL,
 		tanggal_keluar DATE,
@@ -101,6 +127,11 @@ func (a *App) initDatabase() error {
 	`
 
 	_, err = a.db.Exec(createTableSQL)
+	if err == nil && !tableExists {
+		fmt.Println("✅ Database schema created successfully")
+	} else if err == nil {
+		fmt.Println("✅ Database tables already exist")
+	}
 	return err
 }
 
@@ -124,12 +155,12 @@ func (a *App) AddMotor(namaMotor, nomorPolisi, status string, harga float64, tan
 	}
 
 	validStatus := map[string]bool{
-		"tersedia": true, "terjual": true, "dalam_perbaikan": true,
+		"baru_masuk": true, "tersedia": true, "terjual": true, "dalam_perbaikan": true,
 	}
 	if !validStatus[status] {
 		return Response{
 			Success: false,
-			Message: "Status tidak valid. Pilih: tersedia, terjual, atau dalam_perbaikan",
+			Message: "Status tidak valid. Pilih: baru_masuk, tersedia, terjual, atau dalam_perbaikan",
 		}
 	}
 
@@ -294,7 +325,7 @@ func (a *App) UpdateMotor(id, namaMotor, nomorPolisi, status string, harga float
 		params = append(params, nomorPolisi)
 	}
 	if status != "" {
-		validStatus := map[string]bool{"tersedia": true, "terjual": true, "dalam_perbaikan": true}
+		validStatus := map[string]bool{"baru_masuk": true, "tersedia": true, "terjual": true, "dalam_perbaikan": true}
 		if !validStatus[status] {
 			return Response{
 				Success: false,
@@ -350,7 +381,7 @@ func (a *App) UpdateMotor(id, namaMotor, nomorPolisi, status string, harga float
 
 // UpdateMotorStatus mengupdate status motor saja
 func (a *App) UpdateMotorStatus(id, status string) Response {
-	validStatus := map[string]bool{"tersedia": true, "terjual": true, "dalam_perbaikan": true}
+	validStatus := map[string]bool{"baru_masuk": true, "tersedia": true, "terjual": true, "dalam_perbaikan": true}
 	if !validStatus[status] {
 		return Response{
 			Success: false,
@@ -507,7 +538,7 @@ func (a *App) SearchMotors(query string) Response {
 
 // GetMotorsByStatus mengambil motor berdasarkan status
 func (a *App) GetMotorsByStatus(status string) Response {
-	validStatus := map[string]bool{"tersedia": true, "terjual": true, "dalam_perbaikan": true}
+	validStatus := map[string]bool{"baru_masuk": true, "tersedia": true, "terjual": true, "dalam_perbaikan": true}
 	if !validStatus[status] {
 		return Response{
 			Success: false,
@@ -635,9 +666,9 @@ func getNamaBulanIndonesia(bulan string) string {
 
 // GetFinancialSummary mengambil ringkasan keuangan
 func (a *App) GetFinancialSummary() Response {
-	// Total modal (semua motor yang tersedia dan dalam perbaikan)
+	// Total modal (semua motor yang baru masuk, tersedia, dan dalam perbaikan)
 	var totalModal float64
-	a.db.QueryRow("SELECT COALESCE(SUM(harga), 0) FROM motors WHERE status IN ('tersedia', 'dalam_perbaikan')").Scan(&totalModal)
+	a.db.QueryRow("SELECT COALESCE(SUM(harga), 0) FROM motors WHERE status IN ('baru_masuk', 'tersedia', 'dalam_perbaikan')").Scan(&totalModal)
 
 	// Total pendapatan (motor terjual)
 	var totalPendapatan float64
@@ -665,9 +696,9 @@ func (a *App) GetFinancialSummary() Response {
 	var pengeluaranHarian float64
 	thirtyDaysAgo := time.Now().AddDate(0, 0, -30).Format("2006-01-02")
 	a.db.QueryRow(`
-		SELECT COALESCE(SUM(harga) / 30.0, 0) 
-		FROM motors 
-		WHERE tanggal_masuk >= ? AND status IN ('tersedia', 'dalam_perbaikan')
+		SELECT COALESCE(SUM(harga) / 30.0, 0)
+		FROM motors
+		WHERE tanggal_masuk >= ? AND status IN ('baru_masuk', 'tersedia', 'dalam_perbaikan')
 	`, thirtyDaysAgo).Scan(&pengeluaranHarian)
 
 	summary := map[string]interface{}{

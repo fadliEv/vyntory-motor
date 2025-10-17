@@ -147,6 +147,27 @@
 
 .inventory-table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(244, 153, 26, 0.3) rgba(244, 153, 26, 0.1);
+}
+
+.inventory-table-wrapper::-webkit-scrollbar {
+  height: 8px;
+}
+
+.inventory-table-wrapper::-webkit-scrollbar-track {
+  background: rgba(244, 153, 26, 0.1);
+  border-radius: 10px;
+}
+
+.inventory-table-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(244, 153, 26, 0.3);
+  border-radius: 10px;
+}
+
+.inventory-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(244, 153, 26, 0.5);
 }
 
 .inventory-table {
@@ -516,4 +537,74 @@
 .inventory-loading-text {
   color: #6b7280;
   font-size: 14px;
+}
+
+/* Harga Input with Rp Prefix */
+.inventory-form-harga-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inventory-form-harga-prefix {
+  font-weight: 600;
+  color: #F4991A;
+  font-size: 14px;
+}
+
+.inventory-form-harga-input {
+  text-align: right;
+  font-family: 'Courier New', monospace;
+}
+
+.inventory-form-harga-display {
+  display: inline-block;
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+/* Pagination Ellipsis */
+.inventory-pagination-ellipsis {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* Table min-width for horizontal scroll */
+.inventory-table {
+  min-width: 900px;
+}
+
+.inventory-table-th,
+.inventory-table-td {
+  min-width: 120px;
+}
+
+.inventory-table-th:nth-child(1),
+.inventory-table-td:nth-child(1) {
+  min-width: 150px;
+}
+
+.inventory-table-th:last-child,
+.inventory-table-td:last-child {
+  min-width: 100px;
+  position: sticky;
+  right: 0;
+  background-color: white;
+  z-index: 10;
+}
+
+.inventory-table-head .inventory-table-th:last-child {
+  background-color: #344F1F;
+}
+
+.inventory-table-body-row .inventory-table-td:last-child {
+  box-shadow: -2px 0 4px rgba(0, 0, 0, 0.05);
 }
