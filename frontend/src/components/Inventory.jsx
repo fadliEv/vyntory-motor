@@ -13,6 +13,34 @@ const STATUS_OPTIONS = [
   { value: 'dalam_perbaikan', label: 'Perbaikan', color: '#D97706' }
 ];
 
+// Generate year options for Tahun Motor (1980 - current year + 1)
+const generateMotorYearOptions = () => {
+  const currentYear = new Date().getFullYear();
+  const startYear = 1980;
+  const endYear = currentYear + 1;
+  const years = [];
+
+  for (let year = endYear; year >= startYear; year--) {
+    years.push(year);
+  }
+
+  return years;
+};
+
+// Generate year options for Pajak Date (current year - 5 to current year + 10)
+const generatePajakYearOptions = () => {
+  const currentYear = new Date().getFullYear();
+  const startYear = currentYear - 5;
+  const endYear = currentYear + 10;
+  const years = [];
+
+  for (let year = endYear; year >= startYear; year--) {
+    years.push(year);
+  }
+
+  return years;
+};
+
 // Utility function untuk format currency
 const formatCurrency = (value) => {
   if (!value && value !== 0) return '';
@@ -286,7 +314,8 @@ export default function Inventory() {
         formData.warna,
         formData.tahun_motor,
         formData.pajak_date,
-        formData.tanggal_masuk
+        formData.tanggal_masuk,
+        formData.tanggal_keluar
       );
 
       if (response.success) {
@@ -725,30 +754,34 @@ export default function Inventory() {
 
               <div className="inventory-form-group">
                 <label className="inventory-form-label">Tahun Motor *</label>
-                <input
-                  type="text"
+                <select
                   value={formData.tahun_motor}
-                  onChange={(e) => setFormData({ ...formData, tahun_motor: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                  className="inventory-form-input"
-                  placeholder="Contoh: 2022"
-                  maxLength="4"
+                  onChange={(e) => setFormData({ ...formData, tahun_motor: e.target.value })}
+                  className="inventory-form-select"
                   required
-                />
+                >
+                  <option value="">Pilih Tahun Motor</option>
+                  {generateMotorYearOptions().map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
                 <span className="inventory-form-helper-text">Tahun produksi/release motor</span>
               </div>
 
               <div className="inventory-form-group">
                 <label className="inventory-form-label">Pajak Date (Tahun) *</label>
-                <input
-                  type="text"
+                <select
                   value={formData.pajak_date}
-                  onChange={(e) => setFormData({ ...formData, pajak_date: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                  className="inventory-form-input"
-                  placeholder="Contoh: 2026"
-                  maxLength="4"
+                  onChange={(e) => setFormData({ ...formData, pajak_date: e.target.value })}
+                  className="inventory-form-select"
                   required
-                />
-                <span className="inventory-form-helper-text">Masukkan tahun (jika kurang dari tahun sekarang = Pajak Mati)</span>
+                >
+                  <option value="">Pilih Tahun Pajak</option>
+                  {generatePajakYearOptions().map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+                <span className="inventory-form-helper-text">Tahun pajak (jika kurang dari tahun sekarang = Pajak Mati)</span>
               </div>
 
               <div className="inventory-form-group">

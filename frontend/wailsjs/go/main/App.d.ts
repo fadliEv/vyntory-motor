@@ -20,6 +20,6 @@ export function GetPendapatanBulanan():Promise<main.Response>;
 
 export function SearchMotors(arg1:string):Promise<main.Response>;
 
-export function UpdateMotor(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number,arg6:number,arg7:string,arg8:string,arg9:string,arg10:string):Promise<main.Response>;
+export function UpdateMotor(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number,arg6:number,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string):Promise<main.Response>;
 
 export function UpdateMotorStatus(arg1:string,arg2:string):Promise<main.Response>;

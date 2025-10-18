@@ -346,6 +346,14 @@ func (a *App) AddMotor(namaMotor, nomorPolisi, status string, hargaModal, harga 
 		tanggalMasuk = time.Now().Format("2006-01-02")
 	}
 
+	// Validasi status terjual harus memiliki tanggal keluar
+	if status == "terjual" {
+		return Response{
+			Success: false,
+			Message: "Motor dengan status 'terjual' harus memiliki tanggal keluar. Gunakan fitur Update Status untuk menandai motor terjual.",
+		}
+	}
+
 	// Generate ID
 	id := fmt.Sprintf("MTR-%d", time.Now().UnixNano())
 
@@ -490,7 +498,7 @@ func (a *App) getMotorByID(id string) (*Motor, error) {
 }
 
 // UpdateMotor mengupdate data motor
-func (a *App) UpdateMotor(id, namaMotor, nomorPolisi, status string, hargaModal, harga float64, warna, tahunMotor, pajakDate, tanggalMasuk string) Response {
+func (a *App) UpdateMotor(id, namaMotor, nomorPolisi, status string, hargaModal, harga float64, warna, tahunMotor, pajakDate, tanggalMasuk, tanggalKeluar string) Response {
 	// Validasi
 	if id == "" {
 		return Response{
@@ -505,7 +513,44 @@ func (a *App) UpdateMotor(id, namaMotor, nomorPolisi, status string, hargaModal,
 		if err != nil {
 			return Response{
 				Success: false,
-				Message: "Format tanggal tidak valid. Gunakan YYYY-MM-DD",
+				Message: "Format tanggal masuk tidak valid. Gunakan YYYY-MM-DD",
+			}
+		}
+	}
+
+	// Validasi format tanggal keluar jika diisi
+	if tanggalKeluar != "" {
+		_, err := time.Parse("2006-01-02", tanggalKeluar)
+		if err != nil {
+			return Response{
+				Success: false,
+				Message: "Format tanggal keluar tidak valid. Gunakan YYYY-MM-DD",
+			}
+		}
+	}
+
+	// LOGIKA OTOMATIS: Jika tanggal_keluar diisi, otomatis set status = "terjual"
+	if tanggalKeluar != "" {
+		status = "terjual"
+	}
+
+	// Validasi status terjual - cek apakah user mencoba mengubah status menjadi terjual tanpa tanggal keluar
+	if status == "terjual" && tanggalKeluar == "" {
+		// Cek apakah motor sudah memiliki tanggal_keluar sebelumnya
+		var existingTanggalKeluar sql.NullString
+		err := a.db.QueryRow("SELECT tanggal_keluar FROM motors WHERE id = ?", id).Scan(&existingTanggalKeluar)
+		if err != nil {
+			return Response{
+				Success: false,
+				Message: "Motor tidak ditemukan",
+			}
+		}
+
+		// Jika tidak ada tanggal_keluar sebelumnya dan user mencoba set status terjual, tolak
+		if !existingTanggalKeluar.Valid {
+			return Response{
+				Success: false,
+				Message: "Tidak dapat mengubah status menjadi 'terjual' tanpa tanggal keluar. Silakan isi tanggal keluar terlebih dahulu.",
 			}
 		}
 	}
@@ -556,6 +601,15 @@ func (a *App) UpdateMotor(id, namaMotor, nomorPolisi, status string, hargaModal,
 	if tanggalMasuk != "" {
 		query += ", tanggal_masuk = ?"
 		params = append(params, tanggalMasuk)
+	}
+
+	// Handle tanggal_keluar
+	if tanggalKeluar != "" {
+		query += ", tanggal_keluar = ?"
+		params = append(params, tanggalKeluar)
+	} else if status != "" && status != "terjual" {
+		// Jika status diubah ke selain terjual, set tanggal_keluar = NULL
+		query += ", tanggal_keluar = NULL"
 	}
 
 	query += " WHERE id = ?"
