@@ -39,10 +39,11 @@ type Motor struct {
 	NamaMotor        string    `json:"nama_motor"`
 	NomorPolisi      string    `json:"nomor_polisi"`
 	Status           string    `json:"status"`
-	HargaModal    float64   `json:"harga_modal"` // Harga beli/modal
-	Harga         float64   `json:"harga"`       // Harga jual
+	HargaModal    float64   `json:"harga_modal"`  // Harga beli/modal
+	Harga         float64   `json:"harga"`        // Harga jual
 	Warna         string    `json:"warna"`
-	PajakDate     string    `json:"pajak_date"` // Format: "2026"
+	TahunMotor    string    `json:"tahun_motor"`  // Tahun produksi/release motor
+	PajakDate     string    `json:"pajak_date"`   // Format: "2026"
 	TanggalMasuk  string    `json:"tanggal_masuk"`
 	TanggalKeluar    string    `json:"tanggal_keluar,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
@@ -96,11 +97,14 @@ func (a *App) initDatabase() error {
 	if tableExists {
 		fmt.Println("🔍 Checking database schema version...")
 
-		// Check if new columns exist
-		var columnExists int
-		checkColumnErr := a.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('motors') WHERE name='harga_modal'").Scan(&columnExists)
+		// Check if new columns exist (check both harga_modal and tahun_motor)
+		var hargaModalExists int
+		var tahunMotorExists int
 
-		if checkColumnErr != nil || columnExists == 0 {
+		checkErr1 := a.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('motors') WHERE name='harga_modal'").Scan(&hargaModalExists)
+		checkErr2 := a.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('motors') WHERE name='tahun_motor'").Scan(&tahunMotorExists)
+
+		if checkErr1 != nil || checkErr2 != nil || hargaModalExists == 0 || tahunMotorExists == 0 {
 			fmt.Println("⚠️  Missing new columns - needs migration")
 			needsMigration = true
 		} else {
@@ -133,6 +137,7 @@ func (a *App) initDatabase() error {
 		harga_modal REAL NOT NULL DEFAULT 0,
 		harga REAL NOT NULL,
 		warna TEXT,
+		tahun_motor TEXT,
 		pajak_date TEXT,
 		tanggal_masuk DATE NOT NULL,
 		tanggal_keluar DATE,
@@ -190,76 +195,77 @@ func (a *App) seedSampleData() error {
 		hargaModal    float64
 		harga         float64
 		warna         string
+		tahunMotor    string
 		pajakDate     string
 		tanggalMasuk  string
 		tanggalKeluar *string // Use pointer for NULL handling
 	}{
 		// Status: Tersedia (20 motors)
-		{"Honda CB150R", "B 1234 ABC", "tersedia", 13500000, 15000000, "Merah", "2026", "2024-11-10", nil},
-		{"Yamaha NMAX 155", "B 5678 DEF", "tersedia", 16500000, 18500000, "Putih", "2027", "2024-11-15", nil},
-		{"Suzuki GSX-R150", "B 9012 GHI", "tersedia", 20000000, 22500000, "Hitam", "2025", "2024-11-20", nil},
-		{"Honda Vario 160", "B 2468 JKL", "tersedia", 17000000, 19000000, "Abu-abu", "2026", "2024-12-01", nil},
-		{"Yamaha Aerox 155", "B 1357 MNO", "tersedia", 18000000, 20000000, "Biru", "2028", "2024-12-05", nil},
-		{"Suzuki Satria FU", "B 9753 PQR", "tersedia", 11000000, 12500000, "Kuning", "2025", "2024-12-10", nil},
-		{"Kawasaki Ninja 250", "B 8642 STU", "tersedia", 35000000, 38000000, "Hijau", "2027", "2024-12-12", nil},
-		{"Honda PCX 160", "B 7531 VWX", "tersedia", 26000000, 29000000, "Silver", "2028", "2024-12-15", nil},
-		{"Yamaha Mio M3", "B 4826 YZA", "tersedia", 10000000, 11500000, "Pink", "2026", "2024-12-18", nil},
-		{"Suzuki Nex II", "B 3715 BCD", "tersedia", 9500000, 10500000, "Merah", "2025", "2024-12-20", nil},
-		{"Honda Beat Street", "B 6284 EFG", "tersedia", 12000000, 13500000, "Hitam", "2027", "2024-12-22", nil},
-		{"Yamaha Jupiter Z1", "B 9517 HIJ", "tersedia", 11500000, 13000000, "Biru", "2026", "2024-12-25", nil},
-		{"Kawasaki KLX 150", "B 7428 KLM", "tersedia", 22000000, 25000000, "Orange", "2028", "2024-12-28", nil},
-		{"Honda Supra GTR", "B 8539 NOP", "tersedia", 13000000, 14500000, "Merah", "2025", "2025-01-02", nil},
-		{"Yamaha Fino Grande", "B 4261 QRS", "tersedia", 12500000, 14000000, "Putih", "2027", "2025-01-05", nil},
-		{"Suzuki Address", "B 7153 TUV", "tersedia", 11000000, 12500000, "Abu-abu", "2026", "2025-01-08", nil},
-		{"Honda ADV 160", "B 9284 WXY", "tersedia", 28000000, 31000000, "Hitam", "2028", "2025-01-10", nil},
-		{"Yamaha Freego", "B 6173 ZAB", "tersedia", 14000000, 16000000, "Hijau", "2027", "2025-01-12", nil},
-		{"Suzuki Smash", "B 8426 CDE", "tersedia", 8500000, 9500000, "Biru", "2025", "2025-01-14", nil},
-		{"Kawasaki W175", "B 5739 FGH", "tersedia", 24000000, 27000000, "Coklat", "2026", "2025-01-16", nil},
+		{"Honda CB150R", "B 1234 ABC", "tersedia", 13500000, 15000000, "Merah", "2022", "2026", "2024-11-10", nil},
+		{"Yamaha NMAX 155", "B 5678 DEF", "tersedia", 16500000, 18500000, "Putih", "2023", "2027", "2024-11-15", nil},
+		{"Suzuki GSX-R150", "B 9012 GHI", "tersedia", 20000000, 22500000, "Hitam", "2021", "2025", "2024-11-20", nil},
+		{"Honda Vario 160", "B 2468 JKL", "tersedia", 17000000, 19000000, "Abu-abu", "2022", "2026", "2024-12-01", nil},
+		{"Yamaha Aerox 155", "B 1357 MNO", "tersedia", 18000000, 20000000, "Biru", "2024", "2028", "2024-12-05", nil},
+		{"Suzuki Satria FU", "B 9753 PQR", "tersedia", 11000000, 12500000, "Kuning", "2021", "2025", "2024-12-10", nil},
+		{"Kawasaki Ninja 250", "B 8642 STU", "tersedia", 35000000, 38000000, "Hijau", "2023", "2027", "2024-12-12", nil},
+		{"Honda PCX 160", "B 7531 VWX", "tersedia", 26000000, 29000000, "Silver", "2024", "2028", "2024-12-15", nil},
+		{"Yamaha Mio M3", "B 4826 YZA", "tersedia", 10000000, 11500000, "Pink", "2022", "2026", "2024-12-18", nil},
+		{"Suzuki Nex II", "B 3715 BCD", "tersedia", 9500000, 10500000, "Merah", "2021", "2025", "2024-12-20", nil},
+		{"Honda Beat Street", "B 6284 EFG", "tersedia", 12000000, 13500000, "Hitam", "2023", "2027", "2024-12-22", nil},
+		{"Yamaha Jupiter Z1", "B 9517 HIJ", "tersedia", 11500000, 13000000, "Biru", "2022", "2026", "2024-12-25", nil},
+		{"Kawasaki KLX 150", "B 7428 KLM", "tersedia", 22000000, 25000000, "Orange", "2024", "2028", "2024-12-28", nil},
+		{"Honda Supra GTR", "B 8539 NOP", "tersedia", 13000000, 14500000, "Merah", "2021", "2025", "2025-01-02", nil},
+		{"Yamaha Fino Grande", "B 4261 QRS", "tersedia", 12500000, 14000000, "Putih", "2023", "2027", "2025-01-05", nil},
+		{"Suzuki Address", "B 7153 TUV", "tersedia", 11000000, 12500000, "Abu-abu", "2022", "2026", "2025-01-08", nil},
+		{"Honda ADV 160", "B 9284 WXY", "tersedia", 28000000, 31000000, "Hitam", "2024", "2028", "2025-01-10", nil},
+		{"Yamaha Freego", "B 6173 ZAB", "tersedia", 14000000, 16000000, "Hijau", "2023", "2027", "2025-01-12", nil},
+		{"Suzuki Smash", "B 8426 CDE", "tersedia", 8500000, 9500000, "Biru", "2021", "2025", "2025-01-14", nil},
+		{"Kawasaki W175", "B 5739 FGH", "tersedia", 24000000, 27000000, "Coklat", "2022", "2026", "2025-01-16", nil},
 
 		// Status: Baru Masuk (12 motors)
-		{"Honda CBR150R", "B 1593 IJK", "baru_masuk", 28000000, 31000000, "Merah", "2028", "2025-01-17", nil},
-		{"Yamaha R15 V4", "B 7428 LMN", "baru_masuk", 32000000, 35000000, "Biru", "2028", "2025-01-18", nil},
-		{"Suzuki GSX-S150", "B 9517 OPQ", "baru_masuk", 23000000, 26000000, "Hitam", "2027", "2025-01-19", nil},
-		{"Kawasaki Ninja 400", "B 3571 RST", "baru_masuk", 68000000, 75000000, "Hijau", "2028", "2025-01-20", nil},
-		{"Honda Forza 250", "B 8462 UVW", "baru_masuk", 58000000, 65000000, "Putih", "2028", "2025-01-21", nil},
-		{"Yamaha Lexi 125", "B 6284 XYZ", "baru_masuk", 15500000, 17500000, "Abu-abu", "2027", "2025-01-22", nil},
-		{"Suzuki Burgman", "B 4173 AAA", "baru_masuk", 24500000, 27500000, "Silver", "2028", "2025-01-23", nil},
-		{"Honda CRF150L", "B 9528 BBB", "baru_masuk", 27000000, 30000000, "Orange", "2027", "2025-01-24", nil},
-		{"Yamaha XSR155", "B 7361 CCC", "baru_masuk", 29000000, 32000000, "Merah", "2028", "2025-01-25", nil},
-		{"Suzuki V-Strom", "B 5194 DDD", "baru_masuk", 43000000, 48000000, "Kuning", "2027", "2025-01-26", nil},
-		{"Kawasaki Z250", "B 8273 EEE", "baru_masuk", 42000000, 47000000, "Hijau", "2028", "2025-01-27", nil},
-		{"Honda Genio", "B 6415 FFF", "baru_masuk", 13500000, 15000000, "Pink", "2027", "2025-01-28", nil},
+		{"Honda CBR150R", "B 1593 IJK", "baru_masuk", 28000000, 31000000, "Merah", "2024", "2028", "2025-01-17", nil},
+		{"Yamaha R15 V4", "B 7428 LMN", "baru_masuk", 32000000, 35000000, "Biru", "2024", "2028", "2025-01-18", nil},
+		{"Suzuki GSX-S150", "B 9517 OPQ", "baru_masuk", 23000000, 26000000, "Hitam", "2023", "2027", "2025-01-19", nil},
+		{"Kawasaki Ninja 400", "B 3571 RST", "baru_masuk", 68000000, 75000000, "Hijau", "2024", "2028", "2025-01-20", nil},
+		{"Honda Forza 250", "B 8462 UVW", "baru_masuk", 58000000, 65000000, "Putih", "2024", "2028", "2025-01-21", nil},
+		{"Yamaha Lexi 125", "B 6284 XYZ", "baru_masuk", 15500000, 17500000, "Abu-abu", "2023", "2027", "2025-01-22", nil},
+		{"Suzuki Burgman", "B 4173 AAA", "baru_masuk", 24500000, 27500000, "Silver", "2024", "2028", "2025-01-23", nil},
+		{"Honda CRF150L", "B 9528 BBB", "baru_masuk", 27000000, 30000000, "Orange", "2023", "2027", "2025-01-24", nil},
+		{"Yamaha XSR155", "B 7361 CCC", "baru_masuk", 29000000, 32000000, "Merah", "2024", "2028", "2025-01-25", nil},
+		{"Suzuki V-Strom", "B 5194 DDD", "baru_masuk", 43000000, 48000000, "Kuning", "2023", "2027", "2025-01-26", nil},
+		{"Kawasaki Z250", "B 8273 EEE", "baru_masuk", 42000000, 47000000, "Hijau", "2024", "2028", "2025-01-27", nil},
+		{"Honda Genio", "B 6415 FFF", "baru_masuk", 13500000, 15000000, "Pink", "2023", "2027", "2025-01-28", nil},
 
 		// Status: Terjual (14 motors)
-		{"Yamaha MX King", "B 2837 GGG", "terjual", 18000000, 20000000, "Biru", "2026", "2024-09-15", ptrString("2024-12-20")},
-		{"Honda Scoopy", "B 9164 HHH", "terjual", 16500000, 18500000, "Putih", "2027", "2024-09-20", ptrString("2024-12-22")},
-		{"Suzuki Smash FI", "B 4719 III", "terjual", 9000000, 10000000, "Merah", "2024", "2024-08-10", ptrString("2024-12-15")},
-		{"Kawasaki Ninja 250SL", "B 8351 JJJ", "terjual", 32000000, 35000000, "Hijau", "2025", "2024-10-05", ptrString("2025-01-05")},
-		{"Honda Wave 110", "B 5926 KKK", "terjual", 8000000, 9000000, "Hitam", "2023", "2024-07-12", ptrString("2024-11-30")},
-		{"Yamaha Soul GT", "B 7483 LLL", "terjual", 10500000, 12000000, "Kuning", "2026", "2024-10-20", ptrString("2025-01-08")},
-		{"Suzuki Shogun", "B 3162 MMM", "terjual", 7500000, 8500000, "Biru", "2023", "2024-06-25", ptrString("2024-11-15")},
-		{"Honda Revo", "B 6847 NNN", "terjual", 10000000, 11500000, "Merah", "2025", "2024-09-30", ptrString("2024-12-28")},
-		{"Yamaha Vega Force", "B 4295 OOO", "terjual", 9500000, 10500000, "Hitam", "2024", "2024-08-15", ptrString("2024-12-10")},
-		{"Suzuki Thunder", "B 9518 PPP", "terjual", 11000000, 12500000, "Biru", "2026", "2024-10-10", ptrString("2025-01-12")},
-		{"Kawasaki Athlete", "B 7361 QQQ", "terjual", 8500000, 9500000, "Hijau", "2023", "2024-07-05", ptrString("2024-11-20")},
-		{"Honda Blade", "B 2674 RRR", "terjual", 7000000, 8000000, "Silver", "2024", "2024-08-20", ptrString("2024-12-05")},
-		{"Yamaha New Vixion", "B 5819 SSS", "terjual", 17000000, 19000000, "Merah", "2027", "2024-11-01", ptrString("2025-01-15")},
-		{"Suzuki Bandit", "B 8432 TTT", "terjual", 12000000, 14000000, "Hitam", "2025", "2024-09-05", ptrString("2024-12-18")},
+		{"Yamaha MX King", "B 2837 GGG", "terjual", 18000000, 20000000, "Biru", "2022", "2026", "2024-09-15", ptrString("2024-12-20")},
+		{"Honda Scoopy", "B 9164 HHH", "terjual", 16500000, 18500000, "Putih", "2023", "2027", "2024-09-20", ptrString("2024-12-22")},
+		{"Suzuki Smash FI", "B 4719 III", "terjual", 9000000, 10000000, "Merah", "2020", "2024", "2024-08-10", ptrString("2024-12-15")},
+		{"Kawasaki Ninja 250SL", "B 8351 JJJ", "terjual", 32000000, 35000000, "Hijau", "2021", "2025", "2024-10-05", ptrString("2025-01-05")},
+		{"Honda Wave 110", "B 5926 KKK", "terjual", 8000000, 9000000, "Hitam", "2019", "2023", "2024-07-12", ptrString("2024-11-30")},
+		{"Yamaha Soul GT", "B 7483 LLL", "terjual", 10500000, 12000000, "Kuning", "2022", "2026", "2024-10-20", ptrString("2025-01-08")},
+		{"Suzuki Shogun", "B 3162 MMM", "terjual", 7500000, 8500000, "Biru", "2019", "2023", "2024-06-25", ptrString("2024-11-15")},
+		{"Honda Revo", "B 6847 NNN", "terjual", 10000000, 11500000, "Merah", "2021", "2025", "2024-09-30", ptrString("2024-12-28")},
+		{"Yamaha Vega Force", "B 4295 OOO", "terjual", 9500000, 10500000, "Hitam", "2020", "2024", "2024-08-15", ptrString("2024-12-10")},
+		{"Suzuki Thunder", "B 9518 PPP", "terjual", 11000000, 12500000, "Biru", "2022", "2026", "2024-10-10", ptrString("2025-01-12")},
+		{"Kawasaki Athlete", "B 7361 QQQ", "terjual", 8500000, 9500000, "Hijau", "2019", "2023", "2024-07-05", ptrString("2024-11-20")},
+		{"Honda Blade", "B 2674 RRR", "terjual", 7000000, 8000000, "Silver", "2020", "2024", "2024-08-20", ptrString("2024-12-05")},
+		{"Yamaha New Vixion", "B 5819 SSS", "terjual", 17000000, 19000000, "Merah", "2023", "2027", "2024-11-01", ptrString("2025-01-15")},
+		{"Suzuki Bandit", "B 8432 TTT", "terjual", 12000000, 14000000, "Hitam", "2021", "2025", "2024-09-05", ptrString("2024-12-18")},
 
 		// Status: Dalam Perbaikan (4 motors)
-		{"Honda Tiger", "B 6193 UUU", "dalam_perbaikan", 15000000, 17000000, "Hitam", "2024", "2024-11-25", nil},
-		{"Yamaha Scorpio", "B 4758 VVV", "dalam_perbaikan", 13000000, 15000000, "Biru", "2025", "2024-12-01", nil},
-		{"Suzuki Inazuma", "B 9271 WWW", "dalam_perbaikan", 21000000, 24000000, "Merah", "2026", "2024-12-08", nil},
-		{"Kawasaki Versys 650", "B 7524 XXX", "dalam_perbaikan", 85000000, 95000000, "Orange", "2027", "2024-12-12", nil},
+		{"Honda Tiger", "B 6193 UUU", "dalam_perbaikan", 15000000, 17000000, "Hitam", "2020", "2024", "2024-11-25", nil},
+		{"Yamaha Scorpio", "B 4758 VVV", "dalam_perbaikan", 13000000, 15000000, "Biru", "2021", "2025", "2024-12-01", nil},
+		{"Suzuki Inazuma", "B 9271 WWW", "dalam_perbaikan", 21000000, 24000000, "Merah", "2022", "2026", "2024-12-08", nil},
+		{"Kawasaki Versys 650", "B 7524 XXX", "dalam_perbaikan", 85000000, 95000000, "Orange", "2023", "2027", "2024-12-12", nil},
 	}
 
 	successCount := 0
 	for _, motor := range sampleMotors {
 		id := fmt.Sprintf("MTR-%d", time.Now().UnixNano())
-		query := `INSERT INTO motors (id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, pajak_date, tanggal_masuk, tanggal_keluar)
-		          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		query := `INSERT INTO motors (id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, tahun_motor, pajak_date, tanggal_masuk, tanggal_keluar)
+		          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
-		_, err := a.db.Exec(query, id, motor.namaMotor, motor.nomorPolisi, motor.status, motor.hargaModal, motor.harga, motor.warna, motor.pajakDate, motor.tanggalMasuk, motor.tanggalKeluar)
+		_, err := a.db.Exec(query, id, motor.namaMotor, motor.nomorPolisi, motor.status, motor.hargaModal, motor.harga, motor.warna, motor.tahunMotor, motor.pajakDate, motor.tanggalMasuk, motor.tanggalKeluar)
 		if err != nil {
 			fmt.Printf("❌ Error inserting sample motor %s: %v\n", motor.namaMotor, err)
 		} else {
@@ -301,7 +307,7 @@ func containsMiddle(str, substr string) bool {
 // Motor CRUD Operations
 
 // AddMotor menambahkan motor baru
-func (a *App) AddMotor(namaMotor, nomorPolisi, status string, hargaModal, harga float64, warna, pajakDate, tanggalMasuk string) Response {
+func (a *App) AddMotor(namaMotor, nomorPolisi, status string, hargaModal, harga float64, warna, tahunMotor, pajakDate, tanggalMasuk string) Response {
 	// Validasi input
 	if namaMotor == "" || nomorPolisi == "" {
 		return Response{
@@ -344,10 +350,10 @@ func (a *App) AddMotor(namaMotor, nomorPolisi, status string, hargaModal, harga 
 	id := fmt.Sprintf("MTR-%d", time.Now().UnixNano())
 
 	// Insert ke database
-	query := `INSERT INTO motors (id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, pajak_date, tanggal_masuk)
-	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO motors (id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, tahun_motor, pajak_date, tanggal_masuk)
+	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
-	_, err := a.db.Exec(query, id, namaMotor, nomorPolisi, status, hargaModal, harga, warna, pajakDate, tanggalMasuk)
+	_, err := a.db.Exec(query, id, namaMotor, nomorPolisi, status, hargaModal, harga, warna, tahunMotor, pajakDate, tanggalMasuk)
 	if err != nil {
 		// Check for UNIQUE constraint violation
 		if contains(err.Error(), "UNIQUE constraint failed") || contains(err.Error(), "nomor_polisi") {
@@ -380,7 +386,7 @@ func (a *App) AddMotor(namaMotor, nomorPolisi, status string, hargaModal, harga 
 
 // GetMotors mengambil semua data motor
 func (a *App) GetMotors() Response {
-	query := `SELECT id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, pajak_date, tanggal_masuk, tanggal_keluar, created_at, updated_at
+	query := `SELECT id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, tahun_motor, pajak_date, tanggal_masuk, tanggal_keluar, created_at, updated_at
 	          FROM motors ORDER BY created_at DESC`
 
 	rows, err := a.db.Query(query)
@@ -398,11 +404,11 @@ func (a *App) GetMotors() Response {
 		var motor Motor
 		var tanggalMasukStr string
 		var tanggalKeluar *string
-		var warna, pajakDate *string
+		var warna, tahunMotor, pajakDate *string
 
 		err := rows.Scan(
 			&motor.ID, &motor.NamaMotor, &motor.NomorPolisi, &motor.Status,
-			&motor.HargaModal, &motor.Harga, &warna, &pajakDate,
+			&motor.HargaModal, &motor.Harga, &warna, &tahunMotor, &pajakDate,
 			&tanggalMasukStr, &tanggalKeluar, &motor.CreatedAt, &motor.UpdatedAt,
 		)
 		if err != nil {
@@ -415,6 +421,9 @@ func (a *App) GetMotors() Response {
 		}
 		if warna != nil {
 			motor.Warna = *warna
+		}
+		if tahunMotor != nil {
+			motor.TahunMotor = *tahunMotor
 		}
 		if pajakDate != nil {
 			motor.PajakDate = *pajakDate
@@ -447,17 +456,17 @@ func (a *App) GetMotorByID(id string) Response {
 
 // Helper function untuk get motor by ID
 func (a *App) getMotorByID(id string) (*Motor, error) {
-	query := `SELECT id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, pajak_hidup_sampai, tanggal_masuk, tanggal_keluar, created_at, updated_at
+	query := `SELECT id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, tahun_motor, pajak_date, tanggal_masuk, tanggal_keluar, created_at, updated_at
 	          FROM motors WHERE id = ?`
 
 	var motor Motor
 	var tanggalMasukStr string
 	var tanggalKeluar *string
-	var warna, pajakHidupSampai *string
+	var warna, tahunMotor, pajakDate *string
 
 	err := a.db.QueryRow(query, id).Scan(
 		&motor.ID, &motor.NamaMotor, &motor.NomorPolisi, &motor.Status,
-		&motor.HargaModal, &motor.Harga, &warna, &pajakHidupSampai,
+		&motor.HargaModal, &motor.Harga, &warna, &tahunMotor, &pajakDate,
 		&tanggalMasukStr, &tanggalKeluar, &motor.CreatedAt, &motor.UpdatedAt,
 	)
 	if err != nil {
@@ -471,14 +480,17 @@ func (a *App) getMotorByID(id string) (*Motor, error) {
 	if warna != nil {
 		motor.Warna = *warna
 	}
-	if pajakHidupSampai != nil {
-		motor.PajakHidupSampai = *pajakHidupSampai
+	if tahunMotor != nil {
+		motor.TahunMotor = *tahunMotor
+	}
+	if pajakDate != nil {
+		motor.PajakDate = *pajakDate
 	}
 	return &motor, nil
 }
 
 // UpdateMotor mengupdate data motor
-func (a *App) UpdateMotor(id, namaMotor, nomorPolisi, status string, hargaModal, harga float64, warna, pajakHidupSampai, tanggalMasuk string) Response {
+func (a *App) UpdateMotor(id, namaMotor, nomorPolisi, status string, hargaModal, harga float64, warna, tahunMotor, pajakDate, tanggalMasuk string) Response {
 	// Validasi
 	if id == "" {
 		return Response{
@@ -533,9 +545,13 @@ func (a *App) UpdateMotor(id, namaMotor, nomorPolisi, status string, hargaModal,
 		query += ", warna = ?"
 		params = append(params, warna)
 	}
-	if pajakHidupSampai != "" {
-		query += ", pajak_hidup_sampai = ?"
-		params = append(params, pajakHidupSampai)
+	if tahunMotor != "" {
+		query += ", tahun_motor = ?"
+		params = append(params, tahunMotor)
+	}
+	if pajakDate != "" {
+		query += ", pajak_date = ?"
+		params = append(params, pajakDate)
 	}
 	if tanggalMasuk != "" {
 		query += ", tanggal_masuk = ?"
@@ -698,7 +714,7 @@ func (a *App) SearchMotors(query string) Response {
 	}
 
 	searchQuery := `%` + query + `%`
-	sql := `SELECT id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, pajak_hidup_sampai, tanggal_masuk, tanggal_keluar, created_at, updated_at
+	sql := `SELECT id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, tahun_motor, pajak_date, tanggal_masuk, tanggal_keluar, created_at, updated_at
 	        FROM motors
 	        WHERE nama_motor LIKE ? OR nomor_polisi LIKE ?
 	        ORDER BY created_at DESC`
@@ -718,10 +734,12 @@ func (a *App) SearchMotors(query string) Response {
 		var motor Motor
 		var tanggalMasukStr string
 		var tanggalKeluar *string
+		var warna, tahunMotor, pajakDate *string
 
 		err := rows.Scan(
 			&motor.ID, &motor.NamaMotor, &motor.NomorPolisi, &motor.Status,
-			&motor.Harga, &tanggalMasukStr, &tanggalKeluar, &motor.CreatedAt, &motor.UpdatedAt,
+			&motor.HargaModal, &motor.Harga, &warna, &tahunMotor, &pajakDate,
+			&tanggalMasukStr, &tanggalKeluar, &motor.CreatedAt, &motor.UpdatedAt,
 		)
 		if err != nil {
 			continue
@@ -730,6 +748,15 @@ func (a *App) SearchMotors(query string) Response {
 		motor.TanggalMasuk = tanggalMasukStr
 		if tanggalKeluar != nil {
 			motor.TanggalKeluar = *tanggalKeluar
+		}
+		if warna != nil {
+			motor.Warna = *warna
+		}
+		if tahunMotor != nil {
+			motor.TahunMotor = *tahunMotor
+		}
+		if pajakDate != nil {
+			motor.PajakDate = *pajakDate
 		}
 		motors = append(motors, motor)
 	}
@@ -775,7 +802,7 @@ func (a *App) GetMotorsByStatus(status string) Response {
 		}
 	}
 
-	query := `SELECT id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, pajak_hidup_sampai, tanggal_masuk, tanggal_keluar, created_at, updated_at
+	query := `SELECT id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, tahun_motor, pajak_date, tanggal_masuk, tanggal_keluar, created_at, updated_at
 	          FROM motors WHERE status = ? ORDER BY created_at DESC`
 
 	rows, err := a.db.Query(query, status)
@@ -793,11 +820,11 @@ func (a *App) GetMotorsByStatus(status string) Response {
 		var motor Motor
 		var tanggalMasukStr string
 		var tanggalKeluar *string
-		var warna, pajakHidupSampai *string
+		var warna, tahunMotor, pajakDate *string
 
 		err := rows.Scan(
 			&motor.ID, &motor.NamaMotor, &motor.NomorPolisi, &motor.Status,
-			&motor.HargaModal, &motor.Harga, &warna, &pajakHidupSampai,
+			&motor.HargaModal, &motor.Harga, &warna, &tahunMotor, &pajakDate,
 			&tanggalMasukStr, &tanggalKeluar, &motor.CreatedAt, &motor.UpdatedAt,
 		)
 		if err != nil {
@@ -811,8 +838,11 @@ func (a *App) GetMotorsByStatus(status string) Response {
 		if warna != nil {
 			motor.Warna = *warna
 		}
-		if pajakHidupSampai != nil {
-			motor.PajakHidupSampai = *pajakHidupSampai
+		if tahunMotor != nil {
+			motor.TahunMotor = *tahunMotor
+		}
+		if pajakDate != nil {
+			motor.PajakDate = *pajakDate
 		}
 		motors = append(motors, motor)
 	}

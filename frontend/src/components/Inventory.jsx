@@ -72,7 +72,8 @@ export default function Inventory() {
     harga_modal: '',
     harga: '',
     warna: '',
-    pajak_hidup_sampai: '',
+    tahun_motor: '',
+    pajak_date: '',
     tanggal_masuk: new Date().toISOString().split('T')[0],
     tanggal_keluar: '',
   });
@@ -227,7 +228,8 @@ export default function Inventory() {
         hargaModal,
         harga,
         formData.warna,
-        formData.pajak_hidup_sampai,
+        formData.tahun_motor,
+        formData.pajak_date,
         formData.tanggal_masuk
       );
 
@@ -282,7 +284,8 @@ export default function Inventory() {
         hargaModal,
         harga,
         formData.warna,
-        formData.pajak_hidup_sampai,
+        formData.tahun_motor,
+        formData.pajak_date,
         formData.tanggal_masuk
       );
 
@@ -354,7 +357,8 @@ export default function Inventory() {
       harga_modal: '',
       harga: '',
       warna: '',
-      pajak_hidup_sampai: '',
+      tahun_motor: '',
+      pajak_date: '',
       tanggal_masuk: new Date().toISOString().split('T')[0],
       tanggal_keluar: '',
     });
@@ -382,7 +386,8 @@ export default function Inventory() {
       harga_modal: formatHargaInput(motor.harga_modal?.toString() || '0'),
       harga: formatHargaInput(motor.harga.toString()),
       warna: motor.warna || '',
-      pajak_hidup_sampai: motor.pajak_hidup_sampai || '',
+      tahun_motor: motor.tahun_motor || '',
+      pajak_date: motor.pajak_date || '',
       tanggal_masuk: formatTanggal(motor.tanggal_masuk),
       tanggal_keluar: formatTanggal(motor.tanggal_keluar) !== '-' ? formatTanggal(motor.tanggal_keluar) : '',
     });
@@ -719,17 +724,31 @@ export default function Inventory() {
               </div>
 
               <div className="inventory-form-group">
-                <label className="inventory-form-label">Pajak Hidup Sampai *</label>
+                <label className="inventory-form-label">Tahun Motor *</label>
                 <input
                   type="text"
-                  value={formData.pajak_hidup_sampai}
-                  onChange={(e) => setFormData({ ...formData, pajak_hidup_sampai: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                  value={formData.tahun_motor}
+                  onChange={(e) => setFormData({ ...formData, tahun_motor: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                  className="inventory-form-input"
+                  placeholder="Contoh: 2022"
+                  maxLength="4"
+                  required
+                />
+                <span className="inventory-form-helper-text">Tahun produksi/release motor</span>
+              </div>
+
+              <div className="inventory-form-group">
+                <label className="inventory-form-label">Pajak Date (Tahun) *</label>
+                <input
+                  type="text"
+                  value={formData.pajak_date}
+                  onChange={(e) => setFormData({ ...formData, pajak_date: e.target.value.replace(/\D/g, '').slice(0, 4) })}
                   className="inventory-form-input"
                   placeholder="Contoh: 2026"
                   maxLength="4"
                   required
                 />
-                <span className="inventory-form-helper-text">Tahun pajak motor aktif sampai</span>
+                <span className="inventory-form-helper-text">Masukkan tahun (jika kurang dari tahun sekarang = Pajak Mati)</span>
               </div>
 
               <div className="inventory-form-group">
