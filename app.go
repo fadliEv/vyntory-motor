@@ -50,6 +50,24 @@ type Motor struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
+type Capital struct {
+	ID             int       `json:"id"`
+	CurrentBalance float64   `json:"current_balance"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type CapitalTransaction struct {
+	ID              string    `json:"id"`
+	TransactionType string    `json:"transaction_type"` // 'add' or 'subtract'
+	Amount          float64   `json:"amount"`
+	BalanceBefore   float64   `json:"balance_before"`
+	BalanceAfter    float64   `json:"balance_after"`
+	Description     string    `json:"description"`
+	ReferenceType   string    `json:"reference_type"`   // 'motor_purchase', 'manual_add', 'manual_subtract'
+	ReferenceID     string    `json:"reference_id"`     // Motor ID jika dari pembelian motor
+	CreatedAt       time.Time `json:"created_at"`
+}
+
 type Response struct {
 	Success bool        `json:"success"`
 	Message string      `json:"message,omitempty"`
@@ -147,6 +165,33 @@ func (a *App) initDatabase() error {
 
 	CREATE INDEX IF NOT EXISTS idx_motors_status ON motors(status);
 	CREATE INDEX IF NOT EXISTS idx_motors_nomor_polisi ON motors(nomor_polisi);
+
+	-- Table untuk track saldo modal saat ini
+	CREATE TABLE IF NOT EXISTS capital (
+		id INTEGER PRIMARY KEY CHECK(id = 1), -- Only one row allowed
+		current_balance REAL NOT NULL DEFAULT 0,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	-- Initialize capital dengan saldo 0 jika belum ada
+	INSERT OR IGNORE INTO capital (id, current_balance) VALUES (1, 0);
+
+	-- Table untuk track semua transaksi modal (history)
+	CREATE TABLE IF NOT EXISTS capital_transactions (
+		id TEXT PRIMARY KEY,
+		transaction_type TEXT NOT NULL CHECK(transaction_type IN ('add', 'subtract')),
+		amount REAL NOT NULL,
+		balance_before REAL NOT NULL,
+		balance_after REAL NOT NULL,
+		description TEXT,
+		reference_type TEXT, -- 'motor_purchase', 'manual_add', 'manual_subtract', 'repair' (coming soon)
+		reference_id TEXT, -- ID motor jika dari pembelian motor
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_capital_transactions_type ON capital_transactions(transaction_type);
+	CREATE INDEX IF NOT EXISTS idx_capital_transactions_reference ON capital_transactions(reference_type, reference_id);
+	CREATE INDEX IF NOT EXISTS idx_capital_transactions_date ON capital_transactions(created_at);
 	`
 
 	_, err = a.db.Exec(createTableSQL)
@@ -357,11 +402,69 @@ func (a *App) AddMotor(namaMotor, nomorPolisi, status string, hargaModal, harga 
 	// Generate ID
 	id := fmt.Sprintf("MTR-%d", time.Now().UnixNano())
 
-	// Insert ke database
+	// Start transaction untuk atomicity (motor + capital)
+	tx, err := a.db.Begin()
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Gagal memulai transaksi: " + err.Error(),
+		}
+	}
+	defer tx.Rollback()
+
+	// Check dan kurangi modal jika harga_modal > 0 (pembelian motor)
+	var currentBalance, newBalance float64
+	var transactionID string
+	if hargaModal > 0 {
+		// Get current capital balance
+		err = tx.QueryRow("SELECT current_balance FROM capital WHERE id = 1").Scan(&currentBalance)
+		if err != nil {
+			return Response{
+				Success: false,
+				Message: "Gagal mengecek saldo modal: " + err.Error(),
+			}
+		}
+
+		// Check if balance sufficient
+		if currentBalance < hargaModal {
+			return Response{
+				Success: false,
+				Message: fmt.Sprintf("Saldo modal tidak cukup untuk membeli motor ini.\nSaldo saat ini: Rp %.0f\nHarga beli motor: Rp %.0f\nKekurangan: Rp %.0f",
+					currentBalance, hargaModal, hargaModal-currentBalance),
+			}
+		}
+
+		// Update capital balance
+		newBalance = currentBalance - hargaModal
+		_, err = tx.Exec("UPDATE capital SET current_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", newBalance)
+		if err != nil {
+			return Response{
+				Success: false,
+				Message: "Gagal mengupdate saldo modal: " + err.Error(),
+			}
+		}
+
+		// Create capital transaction record
+		transactionID = fmt.Sprintf("CAP-%d", time.Now().UnixNano())
+		description := fmt.Sprintf("Pembelian motor: %s (%s)", namaMotor, nomorPolisi)
+		_, err = tx.Exec(`
+			INSERT INTO capital_transactions (id, transaction_type, amount, balance_before, balance_after, description, reference_type, reference_id)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`, transactionID, "subtract", hargaModal, currentBalance, newBalance, description, "motor_purchase", id)
+
+		if err != nil {
+			return Response{
+				Success: false,
+				Message: "Gagal mencatat transaksi modal: " + err.Error(),
+			}
+		}
+	}
+
+	// Insert motor ke database
 	query := `INSERT INTO motors (id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, tahun_motor, pajak_date, tanggal_masuk)
 	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
-	_, err := a.db.Exec(query, id, namaMotor, nomorPolisi, status, hargaModal, harga, warna, tahunMotor, pajakDate, tanggalMasuk)
+	_, err = tx.Exec(query, id, namaMotor, nomorPolisi, status, hargaModal, harga, warna, tahunMotor, pajakDate, tanggalMasuk)
 	if err != nil {
 		// Check for UNIQUE constraint violation
 		if contains(err.Error(), "UNIQUE constraint failed") || contains(err.Error(), "nomor_polisi") {
@@ -373,6 +476,14 @@ func (a *App) AddMotor(namaMotor, nomorPolisi, status string, hargaModal, harga 
 		return Response{
 			Success: false,
 			Message: "Gagal menambahkan motor: " + err.Error(),
+		}
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		return Response{
+			Success: false,
+			Message: "Gagal menyimpan data: " + err.Error(),
 		}
 	}
 
@@ -1034,6 +1145,221 @@ func (a *App) GetFinancialSummary() Response {
 	return Response{
 		Success: true,
 		Data:    summary,
+	}
+}
+
+// ==================== CAPITAL MANAGEMENT FUNCTIONS ====================
+
+// GetCurrentCapital - mendapatkan saldo modal saat ini
+func (a *App) GetCurrentCapital() Response {
+	var capital Capital
+	err := a.db.QueryRow("SELECT id, current_balance, updated_at FROM capital WHERE id = 1").
+		Scan(&capital.ID, &capital.CurrentBalance, &capital.UpdatedAt)
+
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Gagal mengambil data modal: " + err.Error(),
+		}
+	}
+
+	return Response{
+		Success: true,
+		Data:    capital,
+	}
+}
+
+// AddCapital - menambah modal secara manual
+func (a *App) AddCapital(amount float64, description string) Response {
+	if amount <= 0 {
+		return Response{
+			Success: false,
+			Message: "Jumlah modal harus lebih dari 0",
+		}
+	}
+
+	// Start transaction
+	tx, err := a.db.Begin()
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Gagal memulai transaksi: " + err.Error(),
+		}
+	}
+	defer tx.Rollback()
+
+	// Get current balance
+	var currentBalance float64
+	err = tx.QueryRow("SELECT current_balance FROM capital WHERE id = 1").Scan(&currentBalance)
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Gagal mengambil saldo modal: " + err.Error(),
+		}
+	}
+
+	newBalance := currentBalance + amount
+
+	// Update capital balance
+	_, err = tx.Exec("UPDATE capital SET current_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", newBalance)
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Gagal mengupdate saldo modal: " + err.Error(),
+		}
+	}
+
+	// Create transaction record
+	transactionID := fmt.Sprintf("CAP-%d", time.Now().UnixNano())
+	_, err = tx.Exec(`
+		INSERT INTO capital_transactions (id, transaction_type, amount, balance_before, balance_after, description, reference_type, reference_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, transactionID, "add", amount, currentBalance, newBalance, description, "manual_add", "")
+
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Gagal mencatat transaksi: " + err.Error(),
+		}
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		return Response{
+			Success: false,
+			Message: "Gagal menyimpan transaksi: " + err.Error(),
+		}
+	}
+
+	return Response{
+		Success: true,
+		Message: fmt.Sprintf("Berhasil menambah modal sebesar Rp %.0f", amount),
+		Data: map[string]interface{}{
+			"transaction_id": transactionID,
+			"amount":         amount,
+			"balance_before": currentBalance,
+			"balance_after":  newBalance,
+		},
+	}
+}
+
+// SubtractCapital - mengurangi modal secara manual
+func (a *App) SubtractCapital(amount float64, description string) Response {
+	if amount <= 0 {
+		return Response{
+			Success: false,
+			Message: "Jumlah pengurangan harus lebih dari 0",
+		}
+	}
+
+	// Start transaction
+	tx, err := a.db.Begin()
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Gagal memulai transaksi: " + err.Error(),
+		}
+	}
+	defer tx.Rollback()
+
+	// Get current balance
+	var currentBalance float64
+	err = tx.QueryRow("SELECT current_balance FROM capital WHERE id = 1").Scan(&currentBalance)
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Gagal mengambil saldo modal: " + err.Error(),
+		}
+	}
+
+	// Check if balance is sufficient
+	if currentBalance < amount {
+		return Response{
+			Success: false,
+			Message: fmt.Sprintf("Saldo modal tidak cukup. Saldo saat ini: Rp %.0f, Jumlah pengurangan: Rp %.0f", currentBalance, amount),
+		}
+	}
+
+	newBalance := currentBalance - amount
+
+	// Update capital balance
+	_, err = tx.Exec("UPDATE capital SET current_balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1", newBalance)
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Gagal mengupdate saldo modal: " + err.Error(),
+		}
+	}
+
+	// Create transaction record
+	transactionID := fmt.Sprintf("CAP-%d", time.Now().UnixNano())
+	_, err = tx.Exec(`
+		INSERT INTO capital_transactions (id, transaction_type, amount, balance_before, balance_after, description, reference_type, reference_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, transactionID, "subtract", amount, currentBalance, newBalance, description, "manual_subtract", "")
+
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Gagal mencatat transaksi: " + err.Error(),
+		}
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		return Response{
+			Success: false,
+			Message: "Gagal menyimpan transaksi: " + err.Error(),
+		}
+	}
+
+	return Response{
+		Success: true,
+		Message: fmt.Sprintf("Berhasil mengurangi modal sebesar Rp %.0f", amount),
+		Data: map[string]interface{}{
+			"transaction_id": transactionID,
+			"amount":         amount,
+			"balance_before": currentBalance,
+			"balance_after":  newBalance,
+		},
+	}
+}
+
+// GetCapitalTransactions - mendapatkan history transaksi modal
+func (a *App) GetCapitalTransactions() Response {
+	rows, err := a.db.Query(`
+		SELECT id, transaction_type, amount, balance_before, balance_after, description, reference_type, reference_id, created_at
+		FROM capital_transactions
+		ORDER BY created_at DESC
+	`)
+
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Gagal mengambil history transaksi: " + err.Error(),
+		}
+	}
+	defer rows.Close()
+
+	// Initialize as empty array to avoid null in JSON
+	transactions := make([]CapitalTransaction, 0)
+	for rows.Next() {
+		var t CapitalTransaction
+		err := rows.Scan(&t.ID, &t.TransactionType, &t.Amount, &t.BalanceBefore, &t.BalanceAfter,
+			&t.Description, &t.ReferenceType, &t.ReferenceID, &t.CreatedAt)
+
+		if err != nil {
+			fmt.Printf("Error scanning transaction: %v\n", err)
+			continue
+		}
+
+		transactions = append(transactions, t)
+	}
+
+	return Response{
+		Success: true,
+		Data:    transactions,
+		Count:   len(transactions),
 	}
 }
 

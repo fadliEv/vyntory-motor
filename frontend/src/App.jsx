@@ -5,6 +5,8 @@ import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import Inventory from './components/Inventory';
 import Reports from './components/Reports';
+import DataModal from './components/DataModal';
+import HistoryKeuangan from './components/HistoryKeuangan';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -37,6 +39,10 @@ function App() {
         return <Dashboard />;
       case 'inventory':
         return <Inventory />;
+      case 'data-modal':
+        return <DataModal />;
+      case 'history-keuangan':
+        return <HistoryKeuangan />;
       case 'reports':
         return <Reports />;
       case 'transactions':
