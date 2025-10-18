@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Edit2, Trash2, Search, Zap } from 'lucide-react';
-import { GetMotors, SearchMotors, AddMotor, UpdateMotor, DeleteMotor } from '../../wailsjs/go/main/App';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, Plus, Edit2, Trash2, Search, RefreshCw, Eye } from 'lucide-react';
+import { GetMotors, SearchMotors, GetMotorsByStatus, CheckNomorPolisiExists, AddMotor, UpdateMotor, DeleteMotor } from '../../wailsjs/go/main/App';
+import { AlertModal, ConfirmModal } from './Modal';
+import MotorDetail from './MotorDetail';
 import './Inventory.css';
 
 // Constants
@@ -38,8 +40,22 @@ const parseHarga = (value) => {
   return parseInt(value.replace(/\D/g, '')) || 0;
 };
 
+// Utility function untuk format tanggal (remove timestamp)
+const formatTanggal = (dateString) => {
+  if (!dateString) return '-';
+  // Extract date part only (YYYY-MM-DD) from ISO string
+  return dateString.split('T')[0];
+};
+
+// Utility function untuk validasi dan format nomor polisi
+const formatNomorPolisi = (value) => {
+  // Remove special characters, hanya huruf, angka, dan spasi
+  const cleaned = value.replace(/[^A-Z0-9\s]/gi, '');
+  // Convert to uppercase
+  return cleaned.toUpperCase();
+};
+
 export default function Inventory() {
-  const [motors, setMotors] = useState([]);
   const [filteredMotors, setFilteredMotors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,24 +63,55 @@ export default function Inventory() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingMotor, setEditingMotor] = useState(null);
+  const [nomorPolisiError, setNomorPolisiError] = useState('');
+  const [checkingNomorPolisi, setCheckingNomorPolisi] = useState(false);
   const [formData, setFormData] = useState({
     nama_motor: '',
     nomor_polisi: '',
     status: 'baru_masuk',
+    harga_modal: '',
     harga: '',
+    warna: '',
+    pajak_hidup_sampai: '',
     tanggal_masuk: new Date().toISOString().split('T')[0],
     tanggal_keluar: '',
   });
 
+  // Alert & Confirm Modal States
+  const [alertModal, setAlertModal] = useState({ isOpen: false, type: 'success', message: '' });
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, onConfirm: null, message: '' });
+
+  // Detail View State
+  const [showDetail, setShowDetail] = useState(false);
+  const [selectedMotorId, setSelectedMotorId] = useState(null);
+
   const itemsPerPage = 10;
+  const searchTimeoutRef = useRef(null);
+  const nomorPolisiTimeoutRef = useRef(null);
 
   useEffect(() => {
     loadMotors();
   }, []);
 
+  // Debounced effect untuk search dan filter - panggil backend API
   useEffect(() => {
-    filterMotors();
-  }, [motors, searchTerm, statusFilter]);
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Set new timeout untuk debouncing (300ms)
+    searchTimeoutRef.current = setTimeout(() => {
+      loadMotors();
+    }, 300);
+
+    // Cleanup
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm, statusFilter]);
 
   const loadMotors = async () => {
     try {
@@ -77,46 +124,110 @@ export default function Inventory() {
         return;
       }
 
-      const response = await GetMotors();
-      if (response.success) {
-        setMotors(response.data || []);
+      let response;
+
+      // Priority: Search > Status Filter > All
+      if (searchTerm.trim()) {
+        // Use backend search API
+        response = await SearchMotors(searchTerm.trim());
+      } else if (statusFilter !== 'semua') {
+        // Use backend filter by status API
+        response = await GetMotorsByStatus(statusFilter);
+      } else {
+        // Get all motors
+        response = await GetMotors();
       }
+
+      if (response.success) {
+        setFilteredMotors(response.data || []);
+      } else {
+        console.error('Error from backend:', response.message);
+        setFilteredMotors([]);
+      }
+
+      // Reset to first page when data changes
+      setCurrentPage(1);
     } catch (error) {
       console.error('Error loading motors:', error);
+      setFilteredMotors([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filterMotors = async () => {
-    let filtered = motors;
-
-    // Apply status filter
-    if (statusFilter !== 'semua') {
-      filtered = filtered.filter(m => m.status === statusFilter);
+  // Validation function untuk check duplicate nomor polisi
+  const checkNomorPolisiDuplicate = async (nomorPolisi) => {
+    if (!nomorPolisi.trim()) {
+      setNomorPolisiError('');
+      return;
     }
 
-    // Apply search
-    if (searchTerm) {
-      filtered = filtered.filter(m =>
-        m.nama_motor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.nomor_polisi.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+    setCheckingNomorPolisi(true);
+    try {
+      const excludeID = editingMotor ? editingMotor.id : '';
+      const response = await CheckNomorPolisiExists(nomorPolisi.trim(), excludeID);
+
+      if (response.success && response.data.exists) {
+        setNomorPolisiError(`Nomor polisi '${nomorPolisi}' sudah terdaftar`);
+      } else {
+        setNomorPolisiError('');
+      }
+    } catch (error) {
+      console.error('Error checking nomor polisi:', error);
+      setNomorPolisiError('');
+    } finally {
+      setCheckingNomorPolisi(false);
+    }
+  };
+
+  // Debounced nomor polisi validation dengan auto uppercase
+  const handleNomorPolisiChange = (value) => {
+    const formatted = formatNomorPolisi(value);
+    setFormData({ ...formData, nomor_polisi: formatted });
+
+    // Clear previous timeout
+    if (nomorPolisiTimeoutRef.current) {
+      clearTimeout(nomorPolisiTimeoutRef.current);
     }
 
-    setFilteredMotors(filtered);
+    // Set new timeout untuk debouncing (500ms)
+    nomorPolisiTimeoutRef.current = setTimeout(() => {
+      checkNomorPolisiDuplicate(formatted);
+    }, 500);
+  };
+
+  // Handle refresh - reset semua filter dan reload data
+  const handleRefresh = () => {
+    setSearchTerm('');
+    setStatusFilter('semua');
     setCurrentPage(1);
+    loadMotors();
   };
 
   const handleAddMotor = async (e) => {
     e.preventDefault();
+
+    // Check for duplicate nomor polisi error
+    if (nomorPolisiError) {
+      setAlertModal({
+        isOpen: true,
+        type: 'error',
+        message: 'Tidak dapat menambahkan motor: ' + nomorPolisiError
+      });
+      return;
+    }
+
     try {
+      const hargaModal = parseHarga(formData.harga_modal);
       const harga = parseHarga(formData.harga);
       const response = await AddMotor(
         formData.nama_motor,
         formData.nomor_polisi,
         formData.status,
+        hargaModal,
         harga,
+        formData.warna,
+        formData.pajak_hidup_sampai,
         formData.tanggal_masuk
       );
 
@@ -124,25 +235,54 @@ export default function Inventory() {
         setShowModal(false);
         resetForm();
         loadMotors();
+        // Show success alert
+        setAlertModal({
+          isOpen: true,
+          type: 'success',
+          message: `Motor ${formData.nama_motor} berhasil ditambahkan!`
+        });
       } else {
-        alert(`Error: ${response.message}`);
+        setAlertModal({
+          isOpen: true,
+          type: 'error',
+          message: response.message || 'Gagal menambahkan motor'
+        });
       }
     } catch (error) {
       console.error('Error adding motor:', error);
-      alert('Gagal menambahkan motor');
+      setAlertModal({
+        isOpen: true,
+        type: 'error',
+        message: 'Terjadi kesalahan saat menambahkan motor'
+      });
     }
   };
 
   const handleUpdateMotor = async (e) => {
     e.preventDefault();
+
+    // Check for duplicate nomor polisi error
+    if (nomorPolisiError) {
+      setAlertModal({
+        isOpen: true,
+        type: 'error',
+        message: 'Tidak dapat mengupdate motor: ' + nomorPolisiError
+      });
+      return;
+    }
+
     try {
+      const hargaModal = parseHarga(formData.harga_modal);
       const harga = parseHarga(formData.harga);
       const response = await UpdateMotor(
         editingMotor.id,
         formData.nama_motor,
         formData.nomor_polisi,
         formData.status,
+        hargaModal,
         harga,
+        formData.warna,
+        formData.pajak_hidup_sampai,
         formData.tanggal_masuk
       );
 
@@ -150,28 +290,60 @@ export default function Inventory() {
         setShowModal(false);
         resetForm();
         loadMotors();
+        // Show success alert
+        setAlertModal({
+          isOpen: true,
+          type: 'success',
+          message: `Motor ${formData.nama_motor} berhasil diupdate!`
+        });
       } else {
-        alert(`Error: ${response.message}`);
+        setAlertModal({
+          isOpen: true,
+          type: 'error',
+          message: response.message || 'Gagal mengupdate motor'
+        });
       }
     } catch (error) {
       console.error('Error updating motor:', error);
-      alert('Gagal mengupdate motor');
+      setAlertModal({
+        isOpen: true,
+        type: 'error',
+        message: 'Terjadi kesalahan saat mengupdate motor'
+      });
     }
   };
 
-  const handleDeleteMotor = async (id) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus motor ini?')) {
-      try {
-        const response = await DeleteMotor(id);
-        if (response.success) {
-          loadMotors();
-        } else {
-          alert(`Error: ${response.message}`);
+  const handleDeleteMotor = (id, namaMotor) => {
+    setConfirmModal({
+      isOpen: true,
+      message: `Apakah Anda yakin ingin menghapus motor "${namaMotor}"? Tindakan ini tidak dapat dibatalkan.`,
+      onConfirm: async () => {
+        try {
+          const response = await DeleteMotor(id);
+          if (response.success) {
+            loadMotors();
+            setAlertModal({
+              isOpen: true,
+              type: 'success',
+              message: `Motor ${namaMotor} berhasil dihapus!`
+            });
+          } else {
+            setAlertModal({
+              isOpen: true,
+              type: 'error',
+              message: response.message || 'Gagal menghapus motor'
+            });
+          }
+        } catch (error) {
+          console.error('Error deleting motor:', error);
+          setAlertModal({
+            isOpen: true,
+            type: 'error',
+            message: 'Terjadi kesalahan saat menghapus motor'
+          });
         }
-      } catch (error) {
-        console.error('Error deleting motor:', error);
       }
-    }
+    });
   };
 
   const resetForm = () => {
@@ -179,11 +351,21 @@ export default function Inventory() {
       nama_motor: '',
       nomor_polisi: '',
       status: 'baru_masuk',
+      harga_modal: '',
       harga: '',
+      warna: '',
+      pajak_hidup_sampai: '',
       tanggal_masuk: new Date().toISOString().split('T')[0],
       tanggal_keluar: '',
     });
     setEditingMotor(null);
+    setNomorPolisiError('');
+    setCheckingNomorPolisi(false);
+
+    // Clear any pending timeouts
+    if (nomorPolisiTimeoutRef.current) {
+      clearTimeout(nomorPolisiTimeoutRef.current);
+    }
   };
 
   const openAddModal = () => {
@@ -197,9 +379,12 @@ export default function Inventory() {
       nama_motor: motor.nama_motor,
       nomor_polisi: motor.nomor_polisi,
       status: motor.status,
+      harga_modal: formatHargaInput(motor.harga_modal?.toString() || '0'),
       harga: formatHargaInput(motor.harga.toString()),
-      tanggal_masuk: motor.tanggal_masuk,
-      tanggal_keluar: motor.tanggal_keluar || '',
+      warna: motor.warna || '',
+      pajak_hidup_sampai: motor.pajak_hidup_sampai || '',
+      tanggal_masuk: formatTanggal(motor.tanggal_masuk),
+      tanggal_keluar: formatTanggal(motor.tanggal_keluar) !== '-' ? formatTanggal(motor.tanggal_keluar) : '',
     });
     setShowModal(true);
   };
@@ -245,6 +430,16 @@ export default function Inventory() {
     return statusObj || STATUS_OPTIONS[0];
   };
 
+  const handleViewDetail = (motorId) => {
+    setSelectedMotorId(motorId);
+    setShowDetail(true);
+  };
+
+  // Render Detail Page if selected
+  if (showDetail && selectedMotorId) {
+    return <MotorDetail motorId={selectedMotorId} onBack={() => setShowDetail(false)} />;
+  }
+
   if (loading) {
     return (
       <div className="inventory-loading">
@@ -260,22 +455,22 @@ export default function Inventory() {
     <div className="inventory-container">
       {/* Header Actions */}
       <div className="inventory-header">
-        <div className="inventory-search">
-          <div className="inventory-search-wrapper">
-            <div className="inventory-search-icon">
-              <Search size={20} />
+        <div className="inventory-search-filters">
+          <div className="inventory-search">
+            <div className="inventory-search-wrapper">
+              <div className="inventory-search-icon">
+                <Search size={20} />
+              </div>
+              <input
+                type="text"
+                placeholder="Cari motor atau nomor polisi..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="inventory-search-input"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Cari motor atau nomor polisi..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="inventory-search-input"
-            />
           </div>
-        </div>
 
-        <div className="inventory-controls">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -287,9 +482,15 @@ export default function Inventory() {
             ))}
           </select>
 
+          <button onClick={handleRefresh} className="inventory-refresh-btn" title="Refresh & Reset Filter">
+            Refresh
+          </button>
+        </div>
+
+        <div className="inventory-controls">
           <button onClick={openAddModal} className="inventory-add-btn">
             <Plus size={20} />
-            Tambah Motor
+            Tambah Data
           </button>
         </div>
       </div>
@@ -300,6 +501,7 @@ export default function Inventory() {
           <table className="inventory-table">
             <thead className="inventory-table-head">
               <tr>
+                <th className="inventory-table-th inventory-table-th-no">No</th>
                 <th className="inventory-table-th">Nama Motor</th>
                 <th className="inventory-table-th">Nomor Polisi</th>
                 <th className="inventory-table-th">Status</th>
@@ -313,13 +515,16 @@ export default function Inventory() {
               {paginatedMotors.length > 0 ? (
                 paginatedMotors.map((motor, idx) => {
                   const statusBadge = getStatusBadge(motor.status);
+                  const rowNumber = startIndex + idx + 1;
+                  const isAlternate = idx % 2 === 1;
                   return (
                     <tr
                       key={motor.id}
                       className={`inventory-table-body-row ${
-                        idx % 2 === 1 ? 'inventory-table-body-row-alternate' : ''
+                        isAlternate ? 'inventory-table-body-row-alternate' : ''
                       }`}
                     >
+                      <td className="inventory-table-td inventory-table-td-no inventory-table-td-muted">{rowNumber}</td>
                       <td className="inventory-table-td inventory-table-td-primary">{motor.nama_motor}</td>
                       <td className="inventory-table-td inventory-table-td-muted">{motor.nomor_polisi}</td>
                       <td className="inventory-table-td">
@@ -328,10 +533,17 @@ export default function Inventory() {
                         </span>
                       </td>
                       <td className="inventory-table-td inventory-table-price">{formatCurrency(motor.harga)}</td>
-                      <td className="inventory-table-td inventory-table-td-muted">{motor.tanggal_masuk}</td>
-                      <td className="inventory-table-td inventory-table-td-muted">{motor.tanggal_keluar || '-'}</td>
-                      <td className="inventory-table-td">
+                      <td className="inventory-table-td inventory-table-td-muted">{formatTanggal(motor.tanggal_masuk)}</td>
+                      <td className="inventory-table-td inventory-table-td-muted">{formatTanggal(motor.tanggal_keluar)}</td>
+                      <td className={`inventory-table-td inventory-table-td-aksi ${isAlternate ? 'inventory-table-td-aksi-alternate' : ''}`}>
                         <div className="inventory-actions">
+                          <button
+                            onClick={() => handleViewDetail(motor.id)}
+                            className="inventory-action-btn inventory-action-btn-view"
+                            title="Lihat Detail"
+                          >
+                            <Eye size={18} />
+                          </button>
                           <button
                             onClick={() => openEditModal(motor)}
                             className="inventory-action-btn inventory-action-btn-edit"
@@ -340,7 +552,7 @@ export default function Inventory() {
                             <Edit2 size={18} />
                           </button>
                           <button
-                            onClick={() => handleDeleteMotor(motor.id)}
+                            onClick={() => handleDeleteMotor(motor.id, motor.nama_motor)}
                             className="inventory-action-btn inventory-action-btn-delete"
                             title="Hapus"
                           >
@@ -353,7 +565,7 @@ export default function Inventory() {
                 })
               ) : (
                 <tr>
-                  <td colSpan="7" className="inventory-no-data">
+                  <td colSpan="8" className="inventory-no-data">
                     Tidak ada data motor
                   </td>
                 </tr>
@@ -410,8 +622,13 @@ export default function Inventory() {
         <div className="inventory-modal-overlay" onClick={() => setShowModal(false)}>
           <div className="inventory-modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="inventory-modal-title">
-              {editingMotor ? 'Edit Motor' : 'Tambah Motor Baru'}
+              {editingMotor ? 'Edit Data Motor' : 'Tambah Motor Baru'}
             </h2>
+            <p className="inventory-modal-description">
+              {editingMotor
+                ? 'Perbarui informasi motor yang sudah ada di inventory'
+                : 'Lengkapi form di bawah untuk menambahkan motor baru ke inventory Anda'}
+            </p>
             <form onSubmit={editingMotor ? handleUpdateMotor : handleAddMotor}>
               <div className="inventory-form-group">
                 <label className="inventory-form-label">Nama Motor *</label>
@@ -420,8 +637,10 @@ export default function Inventory() {
                   value={formData.nama_motor}
                   onChange={(e) => setFormData({ ...formData, nama_motor: e.target.value })}
                   className="inventory-form-input"
+                  placeholder="Contoh: Honda CB150R"
                   required
                 />
+                <span className="inventory-form-helper-text">Masukkan merk dan tipe motor</span>
               </div>
 
               <div className="inventory-form-group">
@@ -429,14 +648,49 @@ export default function Inventory() {
                 <input
                   type="text"
                   value={formData.nomor_polisi}
-                  onChange={(e) => setFormData({ ...formData, nomor_polisi: e.target.value })}
-                  className="inventory-form-input"
+                  onChange={(e) => handleNomorPolisiChange(e.target.value)}
+                  className={`inventory-form-input ${nomorPolisiError ? 'inventory-form-input-error' : ''}`}
+                  placeholder="Contoh: B 1234 ABC"
                   required
                 />
+                {!checkingNomorPolisi && !nomorPolisiError && !formData.nomor_polisi && (
+                  <span className="inventory-form-helper-text">Format huruf dan angka, otomatis kapital</span>
+                )}
+                {checkingNomorPolisi && (
+                  <span className="inventory-form-helper-text inventory-form-checking">
+                    Mengecek nomor polisi...
+                  </span>
+                )}
+                {nomorPolisiError && !checkingNomorPolisi && (
+                  <span className="inventory-form-helper-text inventory-form-error-text">
+                    {nomorPolisiError}
+                  </span>
+                )}
+                {!nomorPolisiError && !checkingNomorPolisi && formData.nomor_polisi && (
+                  <span className="inventory-form-helper-text inventory-form-success-text">
+                    ✓ Nomor polisi tersedia
+                  </span>
+                )}
               </div>
 
               <div className="inventory-form-group">
-                <label className="inventory-form-label">Harga *</label>
+                <label className="inventory-form-label">Harga Modal (Beli) *</label>
+                <div className="inventory-form-harga-wrapper">
+                  <span className="inventory-form-harga-prefix">Rp</span>
+                  <input
+                    type="text"
+                    value={formData.harga_modal}
+                    onChange={(e) => setFormData({ ...formData, harga_modal: formatHargaInput(e.target.value) })}
+                    className="inventory-form-input inventory-form-harga-input"
+                    placeholder="0"
+                    required
+                  />
+                </div>
+                <span className="inventory-form-helper-text">Harga saat membeli motor ini</span>
+              </div>
+
+              <div className="inventory-form-group">
+                <label className="inventory-form-label">Harga Jual *</label>
                 <div className="inventory-form-harga-wrapper">
                   <span className="inventory-form-harga-prefix">Rp</span>
                   <input
@@ -447,10 +701,35 @@ export default function Inventory() {
                     placeholder="0"
                     required
                   />
-                  {formData.harga && (
-                    <span className="inventory-form-harga-display">{formatCurrency(parseHarga(formData.harga))}</span>
-                  )}
                 </div>
+                <span className="inventory-form-helper-text">Harga jual kepada customer</span>
+              </div>
+
+              <div className="inventory-form-group">
+                <label className="inventory-form-label">Warna *</label>
+                <input
+                  type="text"
+                  value={formData.warna}
+                  onChange={(e) => setFormData({ ...formData, warna: e.target.value })}
+                  className="inventory-form-input"
+                  placeholder="Contoh: Merah"
+                  required
+                />
+                <span className="inventory-form-helper-text">Warna motor</span>
+              </div>
+
+              <div className="inventory-form-group">
+                <label className="inventory-form-label">Pajak Hidup Sampai *</label>
+                <input
+                  type="text"
+                  value={formData.pajak_hidup_sampai}
+                  onChange={(e) => setFormData({ ...formData, pajak_hidup_sampai: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                  className="inventory-form-input"
+                  placeholder="Contoh: 2026"
+                  maxLength="4"
+                  required
+                />
+                <span className="inventory-form-helper-text">Tahun pajak motor aktif sampai</span>
               </div>
 
               <div className="inventory-form-group">
@@ -464,6 +743,12 @@ export default function Inventory() {
                     <option key={status.value} value={status.value}>{status.label}</option>
                   ))}
                 </select>
+                <span className="inventory-form-helper-text">
+                  {formData.status === 'baru_masuk' && 'Motor baru masuk, belum siap jual'}
+                  {formData.status === 'tersedia' && 'Motor siap dijual'}
+                  {formData.status === 'terjual' && 'Motor sudah terjual'}
+                  {formData.status === 'dalam_perbaikan' && 'Motor sedang dalam perbaikan/service'}
+                </span>
               </div>
 
               <div className="inventory-form-group">
@@ -498,6 +783,7 @@ export default function Inventory() {
                 <button
                   type="submit"
                   className="inventory-form-btn inventory-form-btn-submit"
+                  disabled={nomorPolisiError || checkingNomorPolisi}
                 >
                   {editingMotor ? 'Update' : 'Simpan'}
                 </button>
@@ -506,6 +792,25 @@ export default function Inventory() {
           </div>
         </div>
       )}
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        type={alertModal.type}
+        message={alertModal.message}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        message={confirmModal.message}
+        title="Konfirmasi Hapus"
+        confirmText="Hapus"
+        type="danger"
+      />
     </div>
   );
 }

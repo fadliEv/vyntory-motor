@@ -29,6 +29,21 @@
   }
 }
 
+.inventory-search-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .inventory-search-filters {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+}
+
 .inventory-search {
   flex: 1;
   max-width: 400px;
@@ -137,6 +152,32 @@
   transform: translateY(0);
 }
 
+.inventory-refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  background-color: white;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.inventory-refresh-btn:hover {
+  background-color: #f3f4f6;
+  border-color: #9ca3af;
+  color: #374151;
+}
+
+.inventory-refresh-btn:active {
+  background-color: #e5e7eb;
+}
+
 /* Table */
 .inventory-table-card {
   background-color: white;
@@ -192,6 +233,11 @@
   text-align: center;
 }
 
+.inventory-table-th-no {
+  width: 60px;
+  text-align: center;
+}
+
 .inventory-table-body-row {
   border-bottom: 1px solid #f3f4f6;
   transition: background-color 0.2s ease;
@@ -227,6 +273,20 @@
 .inventory-table-price {
   color: #F4991A;
   font-weight: 600;
+}
+
+.inventory-table-td-no {
+  text-align: center;
+  font-weight: 600;
+  color: #9ca3af;
+}
+
+.inventory-table-td-aksi {
+  background-color: white;
+}
+
+.inventory-table-td-aksi-alternate {
+  background-color: #fafafa;
 }
 
 /* Status Badge */
@@ -271,6 +331,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.inventory-action-btn-view {
+  color: #F4991A;
+}
+
+.inventory-action-btn-view:hover {
+  background-color: rgba(244, 153, 26, 0.1);
+  color: #e08a0e;
 }
 
 .inventory-action-btn-edit {
@@ -400,8 +469,10 @@
   background-color: white;
   border-radius: 12px;
   padding: 32px;
-  max-width: 440px;
+  max-width: 560px;
   width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   animation: modal-fade-in 0.2s ease;
 }
@@ -418,10 +489,17 @@
 }
 
 .inventory-modal-title {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   color: #344F1F;
+  margin-bottom: 8px;
+}
+
+.inventory-modal-description {
+  font-size: 14px;
+  color: #6b7280;
   margin-bottom: 24px;
+  line-height: 1.5;
 }
 
 .inventory-form-group {
@@ -463,6 +541,39 @@
   color: #9ca3af;
 }
 
+.inventory-form-input-error {
+  border-color: #dc2626 !important;
+}
+
+.inventory-form-input-error:focus {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1) !important;
+}
+
+.inventory-form-helper-text {
+  display: block;
+  font-size: 12px;
+  margin-top: 6px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.inventory-form-error-text {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.inventory-form-success-text {
+  color: #059669;
+  font-weight: 600;
+}
+
+.inventory-form-checking {
+  color: #6b7280;
+  font-style: italic;
+  font-weight: 500;
+}
+
 .inventory-form-buttons {
   display: flex;
   gap: 12px;
@@ -496,9 +607,15 @@
   color: white;
 }
 
-.inventory-form-btn-submit:hover {
+.inventory-form-btn-submit:hover:not(:disabled) {
   background-color: #e08a0e;
   box-shadow: 0 4px 12px rgba(244, 153, 26, 0.3);
+}
+
+.inventory-form-btn-submit:disabled {
+  background-color: #d1d5db;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 /* Loading State */
@@ -579,7 +696,7 @@
 
 /* Table min-width for horizontal scroll */
 .inventory-table {
-  min-width: 900px;
+  min-width: 980px;
 }
 
 .inventory-table-th,
