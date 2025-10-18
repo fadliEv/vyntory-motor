@@ -4,7 +4,8 @@
       "Bash(git commit:*)",
       "Bash(dir /s /b \"C:\\Users\\IFG Life\\Documents\\dealer\\Sales-motor\")",
       "Bash(sqlite3 \"C:\\Users\\IFG Life\\Documents\\dealer\\Sales-motor\\dealer_motor.db\" \".schema motors\")",
-      "Bash(wails dev)"
+      "Bash(wails dev)",
+      "Read(//c/Users/IFG Life/Documents/dealer/**)"
     ],
     "deny": [],
     "ask": []
