@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { History, TrendingUp, TrendingDown, Filter, Search, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react';
+import { History, TrendingUp, TrendingDown, Filter, Search, ChevronLeft, ChevronRight, DollarSign, Calendar, X } from 'lucide-react';
 import { GetCapitalTransactions } from '../../wailsjs/go/main/App';
 import './HistoryKeuangan.css';
 
@@ -44,7 +44,11 @@ export default function HistoryKeuangan() {
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+
+  // Date filter
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Statistics
   const [stats, setStats] = useState({
@@ -59,7 +63,7 @@ export default function HistoryKeuangan() {
 
   useEffect(() => {
     applyFilters();
-  }, [transactions, filter, searchTerm]);
+  }, [transactions, filter, searchTerm, startDate, endDate]);
 
   const loadTransactions = async () => {
     setLoading(true);
@@ -104,6 +108,28 @@ export default function HistoryKeuangan() {
       }
     }
 
+    // Apply date filter
+    if (startDate || endDate) {
+      filtered = filtered.filter(transaction => {
+        const transactionDate = new Date(transaction.created_at);
+        const start = startDate ? new Date(startDate) : null;
+        const end = endDate ? new Date(endDate) : null;
+
+        // Set time to start/end of day for accurate comparison
+        if (start) start.setHours(0, 0, 0, 0);
+        if (end) end.setHours(23, 59, 59, 999);
+
+        if (start && end) {
+          return transactionDate >= start && transactionDate <= end;
+        } else if (start) {
+          return transactionDate >= start;
+        } else if (end) {
+          return transactionDate <= end;
+        }
+        return true;
+      });
+    }
+
     // Apply search filter
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
@@ -113,8 +139,24 @@ export default function HistoryKeuangan() {
       );
     }
 
+    // Recalculate stats based on filtered data
+    calculateStats(filtered);
+
     setFilteredTransactions(filtered);
     setCurrentPage(1); // Reset to first page when filter changes
+  };
+
+  const handleResetFilter = () => {
+    setFilter('all');
+    setStartDate('');
+    setEndDate('');
+    setSearchTerm('');
+    setCurrentPage(1);
+  };
+
+  const handleItemsPerPageChange = (value) => {
+    setItemsPerPage(Number(value));
+    setCurrentPage(1);
   };
 
   // Pagination
@@ -190,32 +232,119 @@ export default function HistoryKeuangan() {
           </div>
         </div>
 
-        {/* Filters and Search */}
-        <div className="filters-section">
-          <div className="filter-group">
-            <Filter size={18} />
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="filter-select"
-            >
-              {TRANSACTION_TYPES.map(type => (
-                <option key={type.value} value={type.value}>{type.label}</option>
-              ))}
-            </select>
+        {/* Section Description */}
+        <div className="section-description">
+          <div className="section-icon">
+            <History size={24} />
           </div>
-
-          <div className="search-group">
-            <Search size={18} />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cari berdasarkan deskripsi atau ID..."
-              className="search-input"
-            />
+          <div className="section-text">
+            <h2 className="section-title">Riwayat Transaksi Modal</h2>
+            <p className="section-subtitle">
+              Pantau setiap pergerakan modal usaha Anda. Gunakan filter tanggal untuk analisis periode tertentu dan lihat ringkasan transaksi secara real-time.
+            </p>
           </div>
         </div>
+
+        {/* Compact Filter Container */}
+        <div className="compact-filter-container">
+          <div className="filter-row-first">
+            <div className="filter-group">
+              <Filter size={16} />
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="filter-select"
+              >
+                {TRANSACTION_TYPES.map(type => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="search-group">
+              <Search size={16} />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Cari berdasarkan deskripsi atau ID..."
+                className="search-input"
+              />
+            </div>
+          </div>
+
+          <div className="filter-row-second">
+            <div className="date-group-labeled">
+              <label className="date-label-outside">Dari Tanggal</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="date-input-field"
+              />
+            </div>
+
+            <div className="date-group-labeled">
+              <label className="date-label-outside">Sampai Tanggal</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="date-input-field"
+              />
+            </div>
+
+            {(startDate || endDate || filter !== 'all' || searchTerm) && (
+              <button onClick={handleResetFilter} className="reset-filter-btn">
+                <X size={14} />
+                Reset Semua Filter
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Filter Results Summary */}
+        {(startDate || endDate || filter !== 'all' || searchTerm) && (
+          <div className="filter-results-summary">
+            <div className="filter-results-header">
+              <div className="results-badge">
+                <Filter size={12} />
+                <span>{filteredTransactions.length} Transaksi Ditemukan</span>
+              </div>
+            </div>
+            <div className="filter-results-stats">
+              <div className="result-stat-card stat-income-card">
+                <div className="result-stat-icon">
+                  <TrendingUp size={20} />
+                </div>
+                <div className="result-stat-info">
+                  <span className="result-stat-label">Total Pemasukan</span>
+                  <span className="result-stat-value">{formatCurrency(stats.totalAdd)}</span>
+                </div>
+              </div>
+              <div className="result-stat-card stat-expense-card">
+                <div className="result-stat-icon">
+                  <TrendingDown size={20} />
+                </div>
+                <div className="result-stat-info">
+                  <span className="result-stat-label">Total Pengeluaran</span>
+                  <span className="result-stat-value">{formatCurrency(stats.totalSubtract)}</span>
+                </div>
+              </div>
+              <div className="result-stat-card stat-net-card">
+                <div className="result-stat-icon">
+                  <DollarSign size={20} />
+                </div>
+                <div className="result-stat-info">
+                  <span className="result-stat-label">Selisih Bersih</span>
+                  <span className={`result-stat-value ${stats.netChange >= 0 ? 'positive' : 'negative'}`}>
+                    {stats.netChange >= 0 ? '+' : ''}{formatCurrency(stats.netChange)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Transactions Table */}
         <div className="table-container">
@@ -282,36 +411,84 @@ export default function HistoryKeuangan() {
               </table>
 
               {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="pagination">
-                  <button
-                    onClick={() => goToPage(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="pagination-btn"
-                  >
-                    <ChevronLeft size={18} />
-                    Previous
-                  </button>
+              <div className="pagination-wrapper">
+                <div className="pagination-info-top">
+                  <span className="pagination-text">
+                    Menampilkan {Math.min(startIndex + 1, filteredTransactions.length)} - {Math.min(endIndex, filteredTransactions.length)} dari {filteredTransactions.length} transaksi
+                  </span>
+                </div>
 
-                  <div className="pagination-info">
-                    <span>
-                      Halaman {currentPage} dari {totalPages}
-                    </span>
-                    <span className="pagination-count">
-                      Menampilkan {startIndex + 1}-{Math.min(endIndex, filteredTransactions.length)} dari {filteredTransactions.length} transaksi
-                    </span>
+                <div className="pagination-controls-container">
+                  <div className="per-page-selector">
+                    <label>Tampilkan:</label>
+                    <select value={itemsPerPage} onChange={(e) => handleItemsPerPageChange(e.target.value)} className="per-page-dropdown">
+                      <option value="5">5</option>
+                      <option value="10">10</option>
+                      <option value="20">20</option>
+                      <option value="30">30</option>
+                    </select>
+                    <span>per halaman</span>
                   </div>
 
-                  <button
-                    onClick={() => goToPage(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="pagination-btn"
-                  >
-                    Next
-                    <ChevronRight size={18} />
-                  </button>
+                  <div className="pagination-buttons-group">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="pagination-nav-btn"
+                    >
+                      <ChevronLeft size={18} />
+                    </button>
+
+                    {/* Smart Pagination */}
+                    {(() => {
+                      const pages = [];
+                      const showPages = 5; // Show max 5 page buttons
+
+                      if (totalPages <= showPages) {
+                        // Show all pages if total is small
+                        for (let i = 1; i <= totalPages; i++) {
+                          pages.push(i);
+                        }
+                      } else {
+                        // Smart pagination logic
+                        if (currentPage <= 3) {
+                          // Near start
+                          pages.push(1, 2, 3, 4, '...', totalPages);
+                        } else if (currentPage >= totalPages - 2) {
+                          // Near end
+                          pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+                        } else {
+                          // Middle
+                          pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+                        }
+                      }
+
+                      return pages.map((page, index) => {
+                        if (page === '...') {
+                          return <span key={`ellipsis-${index}`} className="pagination-ellipsis">...</span>;
+                        }
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`pagination-page-btn ${currentPage === page ? 'active' : ''}`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      });
+                    })()}
+
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      className="pagination-nav-btn"
+                    >
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
                 </div>
-              )}
+              </div>
             </>
           )}
         </div>
