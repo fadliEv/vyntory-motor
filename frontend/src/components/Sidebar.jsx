@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart3, Package, FileText, Settings, Home, LogOut, TrendingUp, DollarSign, ChevronDown, ChevronUp, History, Wallet } from 'lucide-react';
+import { BarChart3, Package, FileText, Settings, Home, LogOut, TrendingUp, DollarSign, ChevronDown, ChevronUp, History, Wallet, ShoppingCart } from 'lucide-react';
 import './Sidebar.css';
 
 export default function Sidebar({ currentPage, setCurrentPage, isOpen, onClose }) {
@@ -19,7 +19,16 @@ export default function Sidebar({ currentPage, setCurrentPage, isOpen, onClose }
         { id: 'reports', label: 'Laporan Keuangan', icon: FileText },
       ]
     },
-    { id: 'transactions', label: 'Transaksi', icon: TrendingUp },
+    {
+      id: 'transaksi',
+      label: 'Transaksi',
+      icon: TrendingUp,
+      isExpandable: true,
+      subItems: [
+        { id: 'buat-transaksi', label: 'Buat Transaksi', icon: ShoppingCart },
+        { id: 'history-transaksi', label: 'History', icon: History },
+      ]
+    },
   ];
 
   const handleMenuClick = (pageId, isExpandable) => {

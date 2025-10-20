@@ -6,16 +6,28 @@ export function AddCapital(arg1, arg2) {
   return window['go']['main']['App']['AddCapital'](arg1, arg2);
 }
 
-export function AddMotor(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {
-  return window['go']['main']['App']['AddMotor'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+export function AddMotor(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12) {
+  return window['go']['main']['App']['AddMotor'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12);
 }
 
 export function CheckNomorPolisiExists(arg1, arg2) {
   return window['go']['main']['App']['CheckNomorPolisiExists'](arg1, arg2);
 }
 
+export function CreateTransaction(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['CreateTransaction'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function DeleteMotor(arg1) {
   return window['go']['main']['App']['DeleteMotor'](arg1);
+}
+
+export function GetAvailableMotorsForSale() {
+  return window['go']['main']['App']['GetAvailableMotorsForSale']();
+}
+
+export function GetAvailableYears() {
+  return window['go']['main']['App']['GetAvailableYears']();
 }
 
 export function GetCapitalTransactions() {
@@ -42,20 +54,44 @@ export function GetMotorsByStatus(arg1) {
   return window['go']['main']['App']['GetMotorsByStatus'](arg1);
 }
 
-export function GetPendapatanBulanan() {
-  return window['go']['main']['App']['GetPendapatanBulanan']();
+export function GetPendapatanBulanan(arg1) {
+  return window['go']['main']['App']['GetPendapatanBulanan'](arg1);
+}
+
+export function GetTodayPurchasedMotors() {
+  return window['go']['main']['App']['GetTodayPurchasedMotors']();
+}
+
+export function GetTodaySoldMotors() {
+  return window['go']['main']['App']['GetTodaySoldMotors']();
+}
+
+export function GetTodayStats() {
+  return window['go']['main']['App']['GetTodayStats']();
+}
+
+export function GetTransactions() {
+  return window['go']['main']['App']['GetTransactions']();
 }
 
 export function SearchMotors(arg1) {
   return window['go']['main']['App']['SearchMotors'](arg1);
 }
 
+export function SearchTransactions(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SearchTransactions'](arg1, arg2, arg3);
+}
+
+export function SeedData2025() {
+  return window['go']['main']['App']['SeedData2025']();
+}
+
 export function SubtractCapital(arg1, arg2) {
   return window['go']['main']['App']['SubtractCapital'](arg1, arg2);
 }
 
-export function UpdateMotor(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
-  return window['go']['main']['App']['UpdateMotor'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+export function UpdateMotor(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14) {
+  return window['go']['main']['App']['UpdateMotor'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14);
 }
 
 export function UpdateMotorStatus(arg1, arg2) {

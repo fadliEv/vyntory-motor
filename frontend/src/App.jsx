@@ -7,6 +7,9 @@ import Inventory from './components/Inventory';
 import Reports from './components/Reports';
 import DataModal from './components/DataModal';
 import HistoryKeuangan from './components/HistoryKeuangan';
+import TransactionCreate from './components/TransactionCreate';
+import TransactionHistory from './components/TransactionHistory';
+import TransactionCreateTest from './components/TransactionCreateTest';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -45,8 +48,10 @@ function App() {
         return <HistoryKeuangan />;
       case 'reports':
         return <Reports />;
-      case 'transactions':
-        return <Inventory />; // For now, show inventory
+      case 'buat-transaksi':
+        return <TransactionCreate />;
+      case 'history-transaksi':
+        return <TransactionHistory />;
       default:
         return <Dashboard />;
     }

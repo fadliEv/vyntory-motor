@@ -39,12 +39,15 @@ type Motor struct {
 	NamaMotor        string    `json:"nama_motor"`
 	NomorPolisi      string    `json:"nomor_polisi"`
 	Status           string    `json:"status"`
-	HargaModal    float64   `json:"harga_modal"`  // Harga beli/modal
-	Harga         float64   `json:"harga"`        // Harga jual
-	Warna         string    `json:"warna"`
-	TahunMotor    string    `json:"tahun_motor"`  // Tahun produksi/release motor
-	PajakDate     string    `json:"pajak_date"`   // Format: "2026"
-	TanggalMasuk  string    `json:"tanggal_masuk"`
+	HargaModal       float64   `json:"harga_modal"`     // Harga beli/modal
+	Harga            float64   `json:"harga"`           // Harga jual
+	Warna            string    `json:"warna"`
+	TahunMotor       string    `json:"tahun_motor"`     // Tahun produksi/release motor
+	PajakDate        string    `json:"pajak_date"`      // Format: "2026"
+	NamaPenjual      string    `json:"nama_penjual"`      // Nama penjual (toko/perorangan)
+	TeleponPenjual   string    `json:"telepon_penjual"`   // No telepon penjual
+	AlamatPenjual    string    `json:"alamat_penjual"`    // Alamat penjual
+	TanggalMasuk     string    `json:"tanggal_masuk"`
 	TanggalKeluar    string    `json:"tanggal_keluar,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
@@ -66,6 +69,21 @@ type CapitalTransaction struct {
 	ReferenceType   string    `json:"reference_type"`   // 'motor_purchase', 'manual_add', 'manual_subtract'
 	ReferenceID     string    `json:"reference_id"`     // Motor ID jika dari pembelian motor
 	CreatedAt       time.Time `json:"created_at"`
+}
+
+type Transaction struct {
+	ID                string    `json:"id"`
+	InvoiceNumber     string    `json:"invoice_number"`      // Invoice number format: INV/YYYY/MM/XXXXXX
+	MotorID           string    `json:"motor_id"`
+	MotorNama         string    `json:"motor_nama"`          // Denormalized for easier display
+	MotorNomorPolisi  string    `json:"motor_nomor_polisi"`  // Denormalized for easier display
+	CustomerName      string    `json:"customer_name"`
+	CustomerPhone     string    `json:"customer_phone"`
+	CustomerAddress   string    `json:"customer_address"`
+	HargaBeli         float64   `json:"harga_beli"`          // Harga yang dibayar customer (bisa beda karena nego)
+	TanggalTransaksi  string    `json:"tanggal_transaksi"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 type Response struct {
@@ -130,6 +148,69 @@ func (a *App) initDatabase() error {
 		}
 	}
 
+	// Check and add invoice_number column to transactions table if needed
+	var transactionsTableExists int
+	a.db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='transactions'").Scan(&transactionsTableExists)
+
+	if transactionsTableExists > 0 {
+		var invoiceColumnExists int
+		checkInvoiceErr := a.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('transactions') WHERE name='invoice_number'").Scan(&invoiceColumnExists)
+
+		if checkInvoiceErr == nil && invoiceColumnExists == 0 {
+			fmt.Println("🔄 Adding invoice_number column to transactions table...")
+			_, addColErr := a.db.Exec("ALTER TABLE transactions ADD COLUMN invoice_number TEXT")
+			if addColErr != nil {
+				fmt.Printf("❌ Error adding invoice_number column: %v\n", addColErr)
+			} else {
+				fmt.Println("✅ invoice_number column added successfully")
+				// Update existing records with generated invoice numbers
+				fmt.Println("🔄 Generating invoice numbers for existing transactions...")
+				_, updateErr := a.db.Exec(`
+					UPDATE transactions
+					SET invoice_number = 'INV/' || strftime('%Y', tanggal_transaksi) || '/' || strftime('%m', tanggal_transaksi) || '/' || printf('%06d', ROWID)
+					WHERE invoice_number IS NULL OR invoice_number = ''
+				`)
+				if updateErr != nil {
+					fmt.Printf("❌ Error updating invoice numbers: %v\n", updateErr)
+				} else {
+					fmt.Println("✅ Invoice numbers generated for existing transactions")
+				}
+				// Add unique constraint
+				fmt.Println("🔄 Adding unique constraint to invoice_number...")
+				_, constraintErr := a.db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_invoice_unique ON transactions(invoice_number)")
+				if constraintErr != nil {
+					fmt.Printf("⚠️  Warning: Could not add unique constraint: %v\n", constraintErr)
+				} else {
+					fmt.Println("✅ Unique constraint added to invoice_number")
+				}
+			}
+		}
+	}
+
+	// Check and add penjual (seller) columns to motors table if needed
+	var motorsTableExists int
+	a.db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='motors'").Scan(&motorsTableExists)
+
+	if motorsTableExists > 0 {
+		// Check for nama_penjual column
+		var namaPenjualExists int
+		checkNamaErr := a.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('motors') WHERE name='nama_penjual'").Scan(&namaPenjualExists)
+
+		if checkNamaErr == nil && namaPenjualExists == 0 {
+			fmt.Println("🔄 Adding penjual (seller) columns to motors table...")
+
+			_, err1 := a.db.Exec("ALTER TABLE motors ADD COLUMN nama_penjual TEXT")
+			_, err2 := a.db.Exec("ALTER TABLE motors ADD COLUMN telepon_penjual TEXT")
+			_, err3 := a.db.Exec("ALTER TABLE motors ADD COLUMN alamat_penjual TEXT")
+
+			if err1 != nil || err2 != nil || err3 != nil {
+				fmt.Printf("❌ Error adding penjual columns: %v %v %v\n", err1, err2, err3)
+			} else {
+				fmt.Println("✅ Penjual columns added successfully - existing data preserved!")
+			}
+		}
+	}
+
 	// If migration needed, drop and recreate table
 	if needsMigration {
 		fmt.Println("🔄 Migrating database schema...")
@@ -157,6 +238,9 @@ func (a *App) initDatabase() error {
 		warna TEXT,
 		tahun_motor TEXT,
 		pajak_date TEXT,
+		nama_penjual TEXT,
+		telepon_penjual TEXT,
+		alamat_penjual TEXT,
 		tanggal_masuk DATE NOT NULL,
 		tanggal_keluar DATE,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -192,6 +276,29 @@ func (a *App) initDatabase() error {
 	CREATE INDEX IF NOT EXISTS idx_capital_transactions_type ON capital_transactions(transaction_type);
 	CREATE INDEX IF NOT EXISTS idx_capital_transactions_reference ON capital_transactions(reference_type, reference_id);
 	CREATE INDEX IF NOT EXISTS idx_capital_transactions_date ON capital_transactions(created_at);
+
+	-- Table untuk track transaksi penjualan motor
+	CREATE TABLE IF NOT EXISTS transactions (
+		id TEXT PRIMARY KEY,
+		invoice_number TEXT UNIQUE NOT NULL,
+		motor_id TEXT NOT NULL,
+		motor_nama TEXT NOT NULL,
+		motor_nomor_polisi TEXT NOT NULL,
+		customer_name TEXT NOT NULL,
+		customer_phone TEXT NOT NULL,
+		customer_address TEXT,
+		harga_beli REAL NOT NULL,
+		tanggal_transaksi DATE NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (motor_id) REFERENCES motors(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_transactions_invoice ON transactions(invoice_number);
+	CREATE INDEX IF NOT EXISTS idx_transactions_motor ON transactions(motor_id);
+	CREATE INDEX IF NOT EXISTS idx_transactions_customer_name ON transactions(customer_name);
+	CREATE INDEX IF NOT EXISTS idx_transactions_customer_phone ON transactions(customer_phone);
+	CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(tanggal_transaksi);
 	`
 
 	_, err = a.db.Exec(createTableSQL)
@@ -352,7 +459,7 @@ func containsMiddle(str, substr string) bool {
 // Motor CRUD Operations
 
 // AddMotor menambahkan motor baru
-func (a *App) AddMotor(namaMotor, nomorPolisi, status string, hargaModal, harga float64, warna, tahunMotor, pajakDate, tanggalMasuk string) Response {
+func (a *App) AddMotor(namaMotor, nomorPolisi, status string, hargaModal, harga float64, warna, tahunMotor, pajakDate, namaPenjual, teleponPenjual, alamatPenjual, tanggalMasuk string) Response {
 	// Validasi input
 	if namaMotor == "" || nomorPolisi == "" {
 		return Response{
@@ -461,10 +568,10 @@ func (a *App) AddMotor(namaMotor, nomorPolisi, status string, hargaModal, harga 
 	}
 
 	// Insert motor ke database
-	query := `INSERT INTO motors (id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, tahun_motor, pajak_date, tanggal_masuk)
-	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO motors (id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, tahun_motor, pajak_date, nama_penjual, telepon_penjual, alamat_penjual, tanggal_masuk)
+	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
-	_, err = tx.Exec(query, id, namaMotor, nomorPolisi, status, hargaModal, harga, warna, tahunMotor, pajakDate, tanggalMasuk)
+	_, err = tx.Exec(query, id, namaMotor, nomorPolisi, status, hargaModal, harga, warna, tahunMotor, pajakDate, namaPenjual, teleponPenjual, alamatPenjual, tanggalMasuk)
 	if err != nil {
 		// Check for UNIQUE constraint violation
 		if contains(err.Error(), "UNIQUE constraint failed") || contains(err.Error(), "nomor_polisi") {
@@ -505,7 +612,7 @@ func (a *App) AddMotor(namaMotor, nomorPolisi, status string, hargaModal, harga 
 
 // GetMotors mengambil semua data motor
 func (a *App) GetMotors() Response {
-	query := `SELECT id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, tahun_motor, pajak_date, tanggal_masuk, tanggal_keluar, created_at, updated_at
+	query := `SELECT id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, tahun_motor, pajak_date, nama_penjual, telepon_penjual, alamat_penjual, tanggal_masuk, tanggal_keluar, created_at, updated_at
 	          FROM motors ORDER BY created_at DESC`
 
 	rows, err := a.db.Query(query)
@@ -523,11 +630,12 @@ func (a *App) GetMotors() Response {
 		var motor Motor
 		var tanggalMasukStr string
 		var tanggalKeluar *string
-		var warna, tahunMotor, pajakDate *string
+		var warna, tahunMotor, pajakDate, namaPenjual, teleponPenjual, alamatPenjual *string
 
 		err := rows.Scan(
 			&motor.ID, &motor.NamaMotor, &motor.NomorPolisi, &motor.Status,
 			&motor.HargaModal, &motor.Harga, &warna, &tahunMotor, &pajakDate,
+			&namaPenjual, &teleponPenjual, &alamatPenjual,
 			&tanggalMasukStr, &tanggalKeluar, &motor.CreatedAt, &motor.UpdatedAt,
 		)
 		if err != nil {
@@ -546,6 +654,15 @@ func (a *App) GetMotors() Response {
 		}
 		if pajakDate != nil {
 			motor.PajakDate = *pajakDate
+		}
+		if namaPenjual != nil {
+			motor.NamaPenjual = *namaPenjual
+		}
+		if teleponPenjual != nil {
+			motor.TeleponPenjual = *teleponPenjual
+		}
+		if alamatPenjual != nil {
+			motor.AlamatPenjual = *alamatPenjual
 		}
 		motors = append(motors, motor)
 	}
@@ -575,17 +692,18 @@ func (a *App) GetMotorByID(id string) Response {
 
 // Helper function untuk get motor by ID
 func (a *App) getMotorByID(id string) (*Motor, error) {
-	query := `SELECT id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, tahun_motor, pajak_date, tanggal_masuk, tanggal_keluar, created_at, updated_at
+	query := `SELECT id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, tahun_motor, pajak_date, nama_penjual, telepon_penjual, alamat_penjual, tanggal_masuk, tanggal_keluar, created_at, updated_at
 	          FROM motors WHERE id = ?`
 
 	var motor Motor
 	var tanggalMasukStr string
 	var tanggalKeluar *string
-	var warna, tahunMotor, pajakDate *string
+	var warna, tahunMotor, pajakDate, namaPenjual, teleponPenjual, alamatPenjual *string
 
 	err := a.db.QueryRow(query, id).Scan(
 		&motor.ID, &motor.NamaMotor, &motor.NomorPolisi, &motor.Status,
 		&motor.HargaModal, &motor.Harga, &warna, &tahunMotor, &pajakDate,
+		&namaPenjual, &teleponPenjual, &alamatPenjual,
 		&tanggalMasukStr, &tanggalKeluar, &motor.CreatedAt, &motor.UpdatedAt,
 	)
 	if err != nil {
@@ -605,11 +723,20 @@ func (a *App) getMotorByID(id string) (*Motor, error) {
 	if pajakDate != nil {
 		motor.PajakDate = *pajakDate
 	}
+	if namaPenjual != nil {
+		motor.NamaPenjual = *namaPenjual
+	}
+	if teleponPenjual != nil {
+		motor.TeleponPenjual = *teleponPenjual
+	}
+	if alamatPenjual != nil {
+		motor.AlamatPenjual = *alamatPenjual
+	}
 	return &motor, nil
 }
 
 // UpdateMotor mengupdate data motor
-func (a *App) UpdateMotor(id, namaMotor, nomorPolisi, status string, hargaModal, harga float64, warna, tahunMotor, pajakDate, tanggalMasuk, tanggalKeluar string) Response {
+func (a *App) UpdateMotor(id, namaMotor, nomorPolisi, status string, hargaModal, harga float64, warna, tahunMotor, pajakDate, namaPenjual, teleponPenjual, alamatPenjual, tanggalMasuk, tanggalKeluar string) Response {
 	// Validasi
 	if id == "" {
 		return Response{
@@ -708,6 +835,18 @@ func (a *App) UpdateMotor(id, namaMotor, nomorPolisi, status string, hargaModal,
 	if pajakDate != "" {
 		query += ", pajak_date = ?"
 		params = append(params, pajakDate)
+	}
+	if namaPenjual != "" {
+		query += ", nama_penjual = ?"
+		params = append(params, namaPenjual)
+	}
+	if teleponPenjual != "" {
+		query += ", telepon_penjual = ?"
+		params = append(params, teleponPenjual)
+	}
+	if alamatPenjual != "" {
+		query += ", alamat_penjual = ?"
+		params = append(params, alamatPenjual)
 	}
 	if tanggalMasuk != "" {
 		query += ", tanggal_masuk = ?"
@@ -1019,25 +1158,39 @@ func (a *App) GetMotorsByStatus(status string) Response {
 	}
 }
 
-// GetPendapatanBulanan mengambil data pendapatan per bulan dari SEMUA motor terjual
-func (a *App) GetPendapatanBulanan() Response {
-	fmt.Println("🔍 GetPendapatanBulanan: Query dari tabel motors...")
+// GetPendapatanBulanan mengambil data pendapatan per bulan dengan modal dan profit (12 bulan terakhir dari year yang dipilih)
+func (a *App) GetPendapatanBulanan(year string) Response {
+	fmt.Println("🔍 GetPendapatanBulanan: Query dengan modal dan profit...")
 
-	// Query langsung dari tabel motors dimana status = 'terjual'
+	// Default to current year if not specified
+	if year == "" {
+		year = time.Now().Format("2006")
+	}
+
+	// Query dengan JOIN ke transaksi untuk mendapatkan harga_beli yang sebenarnya
+	// IMPORTANT: Sinkronisasi dengan tanggal_keluar motor
 	query := `
-	SELECT 
-		strftime('%Y-%m', tanggal_keluar) as bulan_tahun,
-		strftime('%Y', tanggal_keluar) as tahun,
-		strftime('%m', tanggal_keluar) as bulan,
+	SELECT
+		strftime('%Y-%m', t.tanggal_transaksi) as bulan_tahun,
+		strftime('%Y', t.tanggal_transaksi) as tahun,
+		strftime('%m', t.tanggal_transaksi) as bulan,
 		COUNT(*) as jumlah_terjual,
-		SUM(harga) as total_penjualan
-	FROM motors 
-	WHERE status = 'terjual' AND tanggal_keluar IS NOT NULL AND tanggal_keluar != ''
-	GROUP BY strftime('%Y-%m', tanggal_keluar)
-	ORDER BY tahun DESC, bulan DESC
+		COALESCE(SUM(m.harga_modal), 0) as total_modal,
+		COALESCE(SUM(t.harga_beli), 0) as total_penjualan,
+		COALESCE(SUM(t.harga_beli - m.harga_modal), 0) as total_profit
+	FROM transactions t
+	INNER JOIN motors m ON t.motor_id = m.id
+	WHERE t.tanggal_transaksi IS NOT NULL
+	  AND t.tanggal_transaksi != ''
+	  AND strftime('%Y', t.tanggal_transaksi) = ?
+	  AND m.status = 'terjual'
+	  AND m.tanggal_keluar IS NOT NULL
+	  AND DATE(t.tanggal_transaksi) = DATE(m.tanggal_keluar)
+	GROUP BY strftime('%Y-%m', t.tanggal_transaksi)
+	ORDER BY bulan_tahun ASC
 	`
 
-	rows, err := a.db.Query(query)
+	rows, err := a.db.Query(query, year)
 	if err != nil {
 		fmt.Println("❌ Error GetPendapatanBulanan:", err)
 		return Response{
@@ -1052,9 +1205,9 @@ func (a *App) GetPendapatanBulanan() Response {
 	for rows.Next() {
 		var bulanTahun, tahun, bulan string
 		var jumlahTerjual int
-		var totalPenjualan float64
+		var totalModal, totalPenjualan, totalProfit float64
 
-		err := rows.Scan(&bulanTahun, &tahun, &bulan, &jumlahTerjual, &totalPenjualan)
+		err := rows.Scan(&bulanTahun, &tahun, &bulan, &jumlahTerjual, &totalModal, &totalPenjualan, &totalProfit)
 		if err != nil {
 			fmt.Println("❌ Error scanning row:", err)
 			continue
@@ -1069,19 +1222,61 @@ func (a *App) GetPendapatanBulanan() Response {
 			"bulan":           bulan,
 			"bulan_nama":      namaBulan,
 			"jumlah_terjual":  jumlahTerjual,
+			"total_modal":     totalModal,
 			"total_penjualan": totalPenjualan,
+			"total_profit":    totalProfit,
 		})
 	}
 
-	fmt.Printf("📊 GetPendapatanBulanan: %d records ditemukan\n", len(pendapatanBulanan))
+	fmt.Printf("📊 GetPendapatanBulanan (Year %s): %d records ditemukan\n", year, len(pendapatanBulanan))
 	for i, item := range pendapatanBulanan {
-		fmt.Printf("  %d. %s - %d motor - %.0f\n", i+1, item["bulan_tahun"], item["jumlah_terjual"], item["total_penjualan"])
+		fmt.Printf("  %d. %s - %d motor - Modal: %.0f, Penjualan: %.0f, Profit: %.0f\n",
+			i+1, item["bulan_tahun"], item["jumlah_terjual"], item["total_modal"], item["total_penjualan"], item["total_profit"])
 	}
 
 	return Response{
 		Success: true,
 		Data:    pendapatanBulanan,
 		Count:   len(pendapatanBulanan),
+	}
+}
+
+// GetAvailableYears - Get list of years that have transaction data
+func (a *App) GetAvailableYears() Response {
+	query := `
+	SELECT DISTINCT strftime('%Y', tanggal_transaksi) as year
+	FROM transactions
+	WHERE tanggal_transaksi IS NOT NULL AND tanggal_transaksi != ''
+	ORDER BY year DESC
+	`
+
+	rows, err := a.db.Query(query)
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Error mengambil data tahun: " + err.Error(),
+		}
+	}
+	defer rows.Close()
+
+	var years []string
+	for rows.Next() {
+		var year string
+		if err := rows.Scan(&year); err != nil {
+			continue
+		}
+		years = append(years, year)
+	}
+
+	// If no years found, return current year
+	if len(years) == 0 {
+		years = append(years, time.Now().Format("2006"))
+	}
+
+	return Response{
+		Success: true,
+		Data:    years,
+		Count:   len(years),
 	}
 }
 
@@ -1095,25 +1290,54 @@ func getNamaBulanIndonesia(bulan string) string {
 	return bulanMap[bulan]
 }
 
-// GetFinancialSummary mengambil ringkasan keuangan
+// GetFinancialSummary mengambil ringkasan keuangan dengan modal dan profit
 func (a *App) GetFinancialSummary() Response {
-	// Total modal (semua motor yang baru masuk, tersedia, dan dalam perbaikan)
-	var totalModal float64
-	a.db.QueryRow("SELECT COALESCE(SUM(harga), 0) FROM motors WHERE status IN ('baru_masuk', 'tersedia', 'dalam_perbaikan')").Scan(&totalModal)
+	// Total modal yang sudah dikeluarkan (dari motor yang tersedia + terjual)
+	var totalModalDikeluarkan float64
+	a.db.QueryRow("SELECT COALESCE(SUM(harga_modal), 0) FROM motors").Scan(&totalModalDikeluarkan)
 
-	// Total pendapatan (motor terjual)
+	// Total modal saat ini (motor yang belum terjual)
+	var totalModalSaatIni float64
+	a.db.QueryRow("SELECT COALESCE(SUM(harga_modal), 0) FROM motors WHERE status IN ('baru_masuk', 'tersedia', 'dalam_perbaikan')").Scan(&totalModalSaatIni)
+
+	// Total pendapatan dari penjualan (dari transaksi, bukan dari motors)
 	var totalPendapatan float64
-	a.db.QueryRow("SELECT COALESCE(SUM(harga), 0) FROM motors WHERE status = 'terjual'").Scan(&totalPendapatan)
+	a.db.QueryRow("SELECT COALESCE(SUM(harga_beli), 0) FROM transactions").Scan(&totalPendapatan)
+
+	// Total modal untuk motor yang sudah terjual
+	var totalModalTerjual float64
+	a.db.QueryRow(`
+		SELECT COALESCE(SUM(m.harga_modal), 0)
+		FROM motors m
+		INNER JOIN transactions t ON m.id = t.motor_id
+	`).Scan(&totalModalTerjual)
+
+	// Total profit (penjualan - modal motor terjual)
+	totalProfit := totalPendapatan - totalModalTerjual
 
 	// Pendapatan bulan ini
-	var pendapatanBulanIni float64
+	var pendapatanBulanIni, profitBulanIni float64
 	currentMonth := time.Now().Format("2006-01")
-	a.db.QueryRow("SELECT COALESCE(SUM(harga), 0) FROM motors WHERE status = 'terjual' AND strftime('%Y-%m', tanggal_keluar) = ?", currentMonth).Scan(&pendapatanBulanIni)
+	a.db.QueryRow(`
+		SELECT
+			COALESCE(SUM(t.harga_beli), 0),
+			COALESCE(SUM(t.harga_beli - m.harga_modal), 0)
+		FROM transactions t
+		INNER JOIN motors m ON t.motor_id = m.id
+		WHERE strftime('%Y-%m', t.tanggal_transaksi) = ?
+	`, currentMonth).Scan(&pendapatanBulanIni, &profitBulanIni)
 
 	// Pendapatan bulan lalu
-	var pendapatanBulanLalu float64
+	var pendapatanBulanLalu, profitBulanLalu float64
 	lastMonth := time.Now().AddDate(0, -1, 0).Format("2006-01")
-	a.db.QueryRow("SELECT COALESCE(SUM(harga), 0) FROM motors WHERE status = 'terjual' AND strftime('%Y-%m', tanggal_keluar) = ?", lastMonth).Scan(&pendapatanBulanLalu)
+	a.db.QueryRow(`
+		SELECT
+			COALESCE(SUM(t.harga_beli), 0),
+			COALESCE(SUM(t.harga_beli - m.harga_modal), 0)
+		FROM transactions t
+		INNER JOIN motors m ON t.motor_id = m.id
+		WHERE strftime('%Y-%m', t.tanggal_transaksi) = ?
+	`, lastMonth).Scan(&pendapatanBulanLalu, &profitBulanLalu)
 
 	// Persentase perubahan
 	persentasePerubahan := 0.0
@@ -1123,23 +1347,133 @@ func (a *App) GetFinancialSummary() Response {
 		persentasePerubahan = 100.0
 	}
 
-	// Hitung rata-rata pengeluaran harian (30 hari terakhir)
+	// Hitung rata-rata pengeluaran harian (30 hari terakhir) dari transaksi
 	var pengeluaranHarian float64
 	thirtyDaysAgo := time.Now().AddDate(0, 0, -30).Format("2006-01-02")
 	a.db.QueryRow(`
-		SELECT COALESCE(SUM(harga) / 30.0, 0)
-		FROM motors
-		WHERE tanggal_masuk >= ? AND status IN ('baru_masuk', 'tersedia', 'dalam_perbaikan')
+		SELECT COALESCE(SUM(harga_beli) / 30.0, 0)
+		FROM transactions
+		WHERE tanggal_transaksi >= ?
 	`, thirtyDaysAgo).Scan(&pengeluaranHarian)
 
 	summary := map[string]interface{}{
-		"total_modal":           totalModal,
-		"total_pendapatan":      totalPendapatan,
-		"pendapatan_bulan_ini":  pendapatanBulanIni,
-		"pendapatan_bulan_lalu": pendapatanBulanLalu,
-		"persentase_perubahan":  persentasePerubahan,
-		"pengeluaran_harian":    pengeluaranHarian,
-		"updated_at":            time.Now().Format("2006-01-02 15:04:05"),
+		"total_modal_dikeluarkan": totalModalDikeluarkan, // Total modal yang sudah dibeli (semua motor)
+		"total_modal":             totalModalSaatIni,      // Modal yang belum kembali (motor belum terjual)
+		"total_pendapatan":        totalPendapatan,        // Total uang masuk dari penjualan
+		"total_profit":            totalProfit,            // Total keuntungan
+		"pendapatan_bulan_ini":    pendapatanBulanIni,
+		"profit_bulan_ini":        profitBulanIni,
+		"pendapatan_bulan_lalu":   pendapatanBulanLalu,
+		"profit_bulan_lalu":       profitBulanLalu,
+		"persentase_perubahan":    persentasePerubahan,
+		"pengeluaran_harian":      pengeluaranHarian,
+		"updated_at":              time.Now().Format("2006-01-02 15:04:05"),
+	}
+
+	return Response{
+		Success: true,
+		Data:    summary,
+	}
+}
+
+// GetFinancialSummaryByYear mengambil ringkasan keuangan berdasarkan tahun dengan filter
+func (a *App) GetFinancialSummaryByYear(tahun string) Response {
+	// Total modal yang sudah dikeluarkan untuk tahun tertentu (dari transaksi pembelian motor)
+	var totalModalDikeluarkan float64
+	a.db.QueryRow(`
+		SELECT COALESCE(SUM(harga_modal), 0)
+		FROM motors
+		WHERE strftime('%Y', tanggal_masuk) = ?
+	`, tahun).Scan(&totalModalDikeluarkan)
+
+	// Total modal saat ini (motor yang belum terjual) - tidak di-filter tahun karena ini inventory saat ini
+	var totalModalSaatIni float64
+	a.db.QueryRow("SELECT COALESCE(SUM(harga_modal), 0) FROM motors WHERE status IN ('baru_masuk', 'tersedia', 'dalam_perbaikan')").Scan(&totalModalSaatIni)
+
+	// Total harga jual inventory (motor yang belum terjual)
+	var totalHargaJualInventory float64
+	a.db.QueryRow("SELECT COALESCE(SUM(harga), 0) FROM motors WHERE status IN ('baru_masuk', 'tersedia', 'dalam_perbaikan')").Scan(&totalHargaJualInventory)
+
+	// Total harga modal inventory (motor yang belum terjual)
+	var totalHargaModalInventory float64
+	a.db.QueryRow("SELECT COALESCE(SUM(harga_modal), 0) FROM motors WHERE status IN ('baru_masuk', 'tersedia', 'dalam_perbaikan')").Scan(&totalHargaModalInventory)
+
+	// Total pendapatan dari penjualan untuk tahun tertentu
+	var totalPendapatan float64
+	a.db.QueryRow(`
+		SELECT COALESCE(SUM(harga_beli), 0)
+		FROM transactions
+		WHERE strftime('%Y', tanggal_transaksi) = ?
+	`, tahun).Scan(&totalPendapatan)
+
+	// Total modal untuk motor yang sudah terjual pada tahun tertentu
+	var totalModalTerjual float64
+	a.db.QueryRow(`
+		SELECT COALESCE(SUM(m.harga_modal), 0)
+		FROM motors m
+		INNER JOIN transactions t ON m.id = t.motor_id
+		WHERE strftime('%Y', t.tanggal_transaksi) = ?
+	`, tahun).Scan(&totalModalTerjual)
+
+	// Total profit untuk tahun tertentu (penjualan - modal motor terjual)
+	totalProfit := totalPendapatan - totalModalTerjual
+
+	// Pendapatan bulan ini (dalam tahun yang dipilih)
+	var pendapatanBulanIni, profitBulanIni float64
+	currentMonth := time.Now().Format("2006-01")
+	currentYear := time.Now().Format("2006")
+
+	// Hanya hitung bulan ini jika tahun yang dipilih adalah tahun sekarang
+	if tahun == currentYear {
+		a.db.QueryRow(`
+			SELECT
+				COALESCE(SUM(t.harga_beli), 0),
+				COALESCE(SUM(t.harga_beli - m.harga_modal), 0)
+			FROM transactions t
+			INNER JOIN motors m ON t.motor_id = m.id
+			WHERE strftime('%Y-%m', t.tanggal_transaksi) = ?
+		`, currentMonth).Scan(&pendapatanBulanIni, &profitBulanIni)
+	}
+
+	// Pendapatan bulan lalu (dalam tahun yang dipilih)
+	var pendapatanBulanLalu, profitBulanLalu float64
+	lastMonth := time.Now().AddDate(0, -1, 0).Format("2006-01")
+	lastMonthYear := time.Now().AddDate(0, -1, 0).Format("2006")
+
+	// Hanya hitung bulan lalu jika tahun yang dipilih cocok
+	if tahun == currentYear || tahun == lastMonthYear {
+		a.db.QueryRow(`
+			SELECT
+				COALESCE(SUM(t.harga_beli), 0),
+				COALESCE(SUM(t.harga_beli - m.harga_modal), 0)
+			FROM transactions t
+			INNER JOIN motors m ON t.motor_id = m.id
+			WHERE strftime('%Y-%m', t.tanggal_transaksi) = ?
+		`, lastMonth).Scan(&pendapatanBulanLalu, &profitBulanLalu)
+	}
+
+	// Persentase perubahan
+	persentasePerubahan := 0.0
+	if pendapatanBulanLalu > 0 {
+		persentasePerubahan = ((pendapatanBulanIni - pendapatanBulanLalu) / pendapatanBulanLalu) * 100
+	} else if pendapatanBulanIni > 0 {
+		persentasePerubahan = 100.0
+	}
+
+	summary := map[string]interface{}{
+		"total_modal_dikeluarkan":      totalModalDikeluarkan,      // Total modal yang sudah dibeli pada tahun tertentu
+		"total_modal":                  totalModalSaatIni,          // Modal yang belum kembali (motor belum terjual)
+		"total_harga_jual_inventory":   totalHargaJualInventory,    // Total harga jual semua motor di inventory
+		"total_harga_modal_inventory":  totalHargaModalInventory,   // Total harga modal semua motor di inventory
+		"total_pendapatan":             totalPendapatan,            // Total uang masuk dari penjualan pada tahun tertentu
+		"total_profit":                 totalProfit,                // Total keuntungan pada tahun tertentu
+		"pendapatan_bulan_ini":         pendapatanBulanIni,
+		"profit_bulan_ini":             profitBulanIni,
+		"pendapatan_bulan_lalu":        pendapatanBulanLalu,
+		"profit_bulan_lalu":            profitBulanLalu,
+		"persentase_perubahan":         persentasePerubahan,
+		"tahun":                        tahun,
+		"updated_at":                   time.Now().Format("2006-01-02 15:04:05"),
 	}
 
 	return Response{
@@ -1420,3 +1754,495 @@ func (a *App) GetCapitalTransactions() Response {
 // 		},
 // 	}
 // }
+
+// ========================================
+// TRANSACTION MANAGEMENT API
+// ========================================
+
+// generateInvoiceNumber - Generate unique invoice number dengan format INV/YYYY/MM/XXXXXX
+func (a *App) generateInvoiceNumber(tx *sql.Tx, tanggalTransaksi string) (string, error) {
+	// Parse tanggal transaksi
+	parsedDate, err := time.Parse("2006-01-02", tanggalTransaksi)
+	if err != nil {
+		return "", err
+	}
+
+	// Format: INV/YYYY/MM
+	year := parsedDate.Format("2006")
+	month := parsedDate.Format("01")
+	prefix := fmt.Sprintf("INV/%s/%s/", year, month)
+
+	// Get count of transactions in the same month
+	var count int
+	query := `
+		SELECT COUNT(*)
+		FROM transactions
+		WHERE invoice_number LIKE ?
+	`
+	err = tx.QueryRow(query, prefix+"%").Scan(&count)
+	if err != nil {
+		return "", err
+	}
+
+	// Generate sequential number (6 digits)
+	sequence := count + 1
+	invoiceNumber := fmt.Sprintf("%s%06d", prefix, sequence)
+
+	return invoiceNumber, nil
+}
+
+// GetAvailableMotorsForSale - Get motors yang bisa dijual (status tersedia saja - siap dijual)
+func (a *App) GetAvailableMotorsForSale() Response {
+	query := `
+	SELECT id, nama_motor, nomor_polisi, status, harga_modal, harga, warna, tahun_motor, pajak_date, tanggal_masuk, created_at, updated_at
+	FROM motors
+	WHERE status = 'tersedia'
+	ORDER BY nama_motor ASC
+	`
+
+	rows, err := a.db.Query(query)
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Error mengambil data motor: " + err.Error(),
+		}
+	}
+	defer rows.Close()
+
+	var motors []Motor
+	for rows.Next() {
+		var motor Motor
+		var tanggalMasuk string
+		err := rows.Scan(
+			&motor.ID,
+			&motor.NamaMotor,
+			&motor.NomorPolisi,
+			&motor.Status,
+			&motor.HargaModal,
+			&motor.Harga,
+			&motor.Warna,
+			&motor.TahunMotor,
+			&motor.PajakDate,
+			&tanggalMasuk,
+			&motor.CreatedAt,
+			&motor.UpdatedAt,
+		)
+		if err != nil {
+			continue
+		}
+		motor.TanggalMasuk = tanggalMasuk
+		motors = append(motors, motor)
+	}
+
+	return Response{
+		Success: true,
+		Data:    motors,
+		Count:   len(motors),
+	}
+}
+
+// CreateTransaction - Membuat transaksi penjualan motor
+func (a *App) CreateTransaction(motorID, customerName, customerPhone, customerAddress string, hargaBeli float64, tanggalTransaksi string) Response {
+	// Validasi input
+	if motorID == "" || customerName == "" || customerPhone == "" || hargaBeli <= 0 || tanggalTransaksi == "" {
+		return Response{
+			Success: false,
+			Message: "Data tidak lengkap. Pastikan semua field required diisi.",
+		}
+	}
+
+	// Start transaction
+	tx, err := a.db.Begin()
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Error memulai transaksi: " + err.Error(),
+		}
+	}
+	defer tx.Rollback()
+
+	// Get motor data dan validasi motor masih tersedia
+	var motor Motor
+	err = tx.QueryRow(`
+		SELECT id, nama_motor, nomor_polisi, status, harga_modal, harga
+		FROM motors
+		WHERE id = ?
+	`, motorID).Scan(&motor.ID, &motor.NamaMotor, &motor.NomorPolisi, &motor.Status, &motor.HargaModal, &motor.Harga)
+
+	if err == sql.ErrNoRows {
+		return Response{
+			Success: false,
+			Message: "Motor tidak ditemukan",
+		}
+	} else if err != nil {
+		return Response{
+			Success: false,
+			Message: "Error mengambil data motor: " + err.Error(),
+		}
+	}
+
+	// Validasi motor belum terjual
+	if motor.Status == "terjual" {
+		return Response{
+			Success: false,
+			Message: "Motor sudah terjual. Silakan pilih motor lain.",
+		}
+	}
+
+	// Generate transaction ID
+	transactionID := fmt.Sprintf("TRX-%d", time.Now().UnixNano())
+
+	// Generate invoice number
+	invoiceNumber, err := a.generateInvoiceNumber(tx, tanggalTransaksi)
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Error generate invoice number: " + err.Error(),
+		}
+	}
+
+	// Insert transaction record
+	_, err = tx.Exec(`
+		INSERT INTO transactions (id, invoice_number, motor_id, motor_nama, motor_nomor_polisi, customer_name, customer_phone, customer_address, harga_beli, tanggal_transaksi, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+	`, transactionID, invoiceNumber, motorID, motor.NamaMotor, motor.NomorPolisi, customerName, customerPhone, customerAddress, hargaBeli, tanggalTransaksi)
+
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Error membuat transaksi: " + err.Error(),
+		}
+	}
+
+	// Update motor status menjadi 'terjual' dan set tanggal_keluar
+	_, err = tx.Exec(`
+		UPDATE motors
+		SET status = 'terjual', tanggal_keluar = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, tanggalTransaksi, motorID)
+
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Error mengupdate status motor: " + err.Error(),
+		}
+	}
+
+	// Commit transaction
+	err = tx.Commit()
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Error menyimpan transaksi: " + err.Error(),
+		}
+	}
+
+	return Response{
+		Success: true,
+		Message: fmt.Sprintf("Transaksi berhasil! Motor %s telah terjual kepada %s", motor.NamaMotor, customerName),
+		Data: map[string]interface{}{
+			"transaction_id": transactionID,
+			"invoice_number": invoiceNumber,
+			"motor_nama":     motor.NamaMotor,
+			"customer_name":  customerName,
+		},
+	}
+}
+
+// GetTransactions - Get all transactions dengan optional filters
+func (a *App) GetTransactions() Response {
+	query := `
+	SELECT id, invoice_number, motor_id, motor_nama, motor_nomor_polisi, customer_name, customer_phone, customer_address, harga_beli, tanggal_transaksi, created_at, updated_at
+	FROM transactions
+	ORDER BY tanggal_transaksi DESC, created_at DESC
+	`
+
+	rows, err := a.db.Query(query)
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Error mengambil data transaksi: " + err.Error(),
+		}
+	}
+	defer rows.Close()
+
+	var transactions []Transaction
+	for rows.Next() {
+		var trx Transaction
+		err := rows.Scan(
+			&trx.ID,
+			&trx.InvoiceNumber,
+			&trx.MotorID,
+			&trx.MotorNama,
+			&trx.MotorNomorPolisi,
+			&trx.CustomerName,
+			&trx.CustomerPhone,
+			&trx.CustomerAddress,
+			&trx.HargaBeli,
+			&trx.TanggalTransaksi,
+			&trx.CreatedAt,
+			&trx.UpdatedAt,
+		)
+		if err != nil {
+			continue
+		}
+		transactions = append(transactions, trx)
+	}
+
+	return Response{
+		Success: true,
+		Data:    transactions,
+		Count:   len(transactions),
+	}
+}
+
+// SearchTransactions - Search transactions dengan berbagai filter
+func (a *App) SearchTransactions(searchTerm, startDate, endDate string) Response {
+	query := `
+	SELECT id, invoice_number, motor_id, motor_nama, motor_nomor_polisi, customer_name, customer_phone, customer_address, harga_beli, tanggal_transaksi, created_at, updated_at
+	FROM transactions
+	WHERE 1=1
+	`
+
+	var args []interface{}
+
+	// Apply search filter
+	if searchTerm != "" {
+		query += ` AND (
+			customer_name LIKE ? OR
+			customer_phone LIKE ? OR
+			motor_nama LIKE ? OR
+			motor_nomor_polisi LIKE ? OR
+			invoice_number LIKE ?
+		)`
+		searchPattern := "%" + searchTerm + "%"
+		args = append(args, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern)
+	}
+
+	// Apply date range filter
+	if startDate != "" && endDate != "" {
+		query += ` AND tanggal_transaksi BETWEEN ? AND ?`
+		args = append(args, startDate, endDate)
+	} else if startDate != "" {
+		query += ` AND tanggal_transaksi >= ?`
+		args = append(args, startDate)
+	} else if endDate != "" {
+		query += ` AND tanggal_transaksi <= ?`
+		args = append(args, endDate)
+	}
+
+	query += ` ORDER BY tanggal_transaksi DESC, created_at DESC`
+
+	rows, err := a.db.Query(query, args...)
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Error searching transactions: " + err.Error(),
+		}
+	}
+	defer rows.Close()
+
+	var transactions []Transaction
+	for rows.Next() {
+		var trx Transaction
+		err := rows.Scan(
+			&trx.ID,
+			&trx.InvoiceNumber,
+			&trx.MotorID,
+			&trx.MotorNama,
+			&trx.MotorNomorPolisi,
+			&trx.CustomerName,
+			&trx.CustomerPhone,
+			&trx.CustomerAddress,
+			&trx.HargaBeli,
+			&trx.TanggalTransaksi,
+			&trx.CreatedAt,
+			&trx.UpdatedAt,
+		)
+		if err != nil {
+			continue
+		}
+		transactions = append(transactions, trx)
+	}
+
+	return Response{
+		Success: true,
+		Data:    transactions,
+		Count:   len(transactions),
+	}
+}
+
+// ==================== TODAY'S STATISTICS ====================
+
+// GetTodayStats - Get comprehensive statistics for today
+func (a *App) GetTodayStats() Response {
+	today := time.Now().Format("2006-01-02")
+
+	// Motors sold today (from transactions) - SINKRON dengan tanggal_keluar motor
+	var motorsTerjualHariIni int
+	var pendapatanHariIni, profitHariIni float64
+	a.db.QueryRow(`
+		SELECT
+			COUNT(*),
+			COALESCE(SUM(t.harga_beli), 0),
+			COALESCE(SUM(t.harga_beli - m.harga_modal), 0)
+		FROM transactions t
+		INNER JOIN motors m ON t.motor_id = m.id
+		WHERE DATE(t.tanggal_transaksi) = ?
+		  AND m.status = 'terjual'
+		  AND m.tanggal_keluar IS NOT NULL
+		  AND DATE(t.tanggal_transaksi) = DATE(m.tanggal_keluar)
+	`, today).Scan(&motorsTerjualHariIni, &pendapatanHariIni, &profitHariIni)
+
+	// Motors purchased/entered today (from motors table) - berdasarkan tanggal_masuk
+	var motorsBeliHariIni int
+	var modalKeluarHariIni float64
+	a.db.QueryRow(`
+		SELECT
+			COUNT(*),
+			COALESCE(SUM(harga_modal), 0)
+		FROM motors
+		WHERE DATE(tanggal_masuk) = ?
+	`, today).Scan(&motorsBeliHariIni, &modalKeluarHariIni)
+
+	// Capital transactions today (manual add/subtract)
+	var modalMasukManual, modalKeluarManual float64
+	a.db.QueryRow(`
+		SELECT
+			COALESCE(SUM(CASE WHEN transaction_type = 'add' THEN amount ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN transaction_type = 'subtract' AND reference_type = 'manual_subtract' THEN amount ELSE 0 END), 0)
+		FROM capital_transactions
+		WHERE DATE(created_at) = ?
+	`, today).Scan(&modalMasukManual, &modalKeluarManual)
+
+	stats := map[string]interface{}{
+		"tanggal":               today,
+		"motors_terjual":        motorsTerjualHariIni,
+		"pendapatan":            pendapatanHariIni,
+		"profit":                profitHariIni,
+		"motors_dibeli":         motorsBeliHariIni,
+		"modal_keluar_pembelian": modalKeluarHariIni,
+		"modal_masuk_manual":    modalMasukManual,
+		"modal_keluar_manual":   modalKeluarManual,
+		"total_modal_keluar":    modalKeluarHariIni + modalKeluarManual,
+		"total_modal_masuk":     modalMasukManual,
+		"net_cashflow":          pendapatanHariIni + modalMasukManual - (modalKeluarHariIni + modalKeluarManual),
+	}
+
+	return Response{
+		Success: true,
+		Data:    stats,
+	}
+}
+
+// GetTodaySoldMotors - Get motors sold today with details - SINKRON dengan tanggal_keluar
+func (a *App) GetTodaySoldMotors() Response {
+	today := time.Now().Format("2006-01-02")
+
+	query := `
+	SELECT
+		t.id, t.invoice_number, t.motor_nama, t.motor_nomor_polisi,
+		t.customer_name, t.harga_beli, t.tanggal_transaksi,
+		m.harga_modal, m.tanggal_keluar,
+		(t.harga_beli - m.harga_modal) as profit
+	FROM transactions t
+	INNER JOIN motors m ON t.motor_id = m.id
+	WHERE DATE(t.tanggal_transaksi) = ?
+	  AND m.status = 'terjual'
+	  AND m.tanggal_keluar IS NOT NULL
+	  AND DATE(t.tanggal_transaksi) = DATE(m.tanggal_keluar)
+	ORDER BY t.tanggal_transaksi DESC
+	`
+
+	rows, err := a.db.Query(query, today)
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Error mengambil motor terjual hari ini: " + err.Error(),
+		}
+	}
+	defer rows.Close()
+
+	var results []map[string]interface{}
+	for rows.Next() {
+		var id, invoiceNumber, motorNama, motorNopol, customerName, tanggalTransaksi, tanggalKeluar string
+		var hargaBeli, hargaModal, profit float64
+
+		err := rows.Scan(&id, &invoiceNumber, &motorNama, &motorNopol, &customerName, &hargaBeli, &tanggalTransaksi, &hargaModal, &tanggalKeluar, &profit)
+		if err != nil {
+			continue
+		}
+
+		results = append(results, map[string]interface{}{
+			"id":                id,
+			"invoice_number":    invoiceNumber,
+			"motor_nama":        motorNama,
+			"motor_nomor_polisi": motorNopol,
+			"customer_name":     customerName,
+			"harga_beli":        hargaBeli,
+			"harga_modal":       hargaModal,
+			"profit":            profit,
+			"tanggal_transaksi": tanggalTransaksi,
+			"tanggal_keluar":    tanggalKeluar,
+		})
+	}
+
+	return Response{
+		Success: true,
+		Data:    results,
+		Count:   len(results),
+	}
+}
+
+// GetTodayPurchasedMotors - Get motors purchased/entered today
+func (a *App) GetTodayPurchasedMotors() Response {
+	today := time.Now().Format("2006-01-02")
+
+	query := `
+	SELECT
+		id, nama_motor, nomor_polisi, harga_modal, harga, warna,
+		tahun_motor, nama_penjual, status, tanggal_masuk
+	FROM motors
+	WHERE DATE(tanggal_masuk) = ?
+	ORDER BY tanggal_masuk DESC
+	`
+
+	rows, err := a.db.Query(query, today)
+	if err != nil {
+		return Response{
+			Success: false,
+			Message: "Error mengambil motor dibeli hari ini: " + err.Error(),
+		}
+	}
+	defer rows.Close()
+
+	var results []map[string]interface{}
+	for rows.Next() {
+		var id, namaMotor, nopol, warna, tahunMotor, namaPenjual, status, tanggalMasuk string
+		var hargaModal, harga float64
+
+		err := rows.Scan(&id, &namaMotor, &nopol, &hargaModal, &harga, &warna, &tahunMotor, &namaPenjual, &status, &tanggalMasuk)
+		if err != nil {
+			continue
+		}
+
+		results = append(results, map[string]interface{}{
+			"id":              id,
+			"nama_motor":      namaMotor,
+			"nomor_polisi":    nopol,
+			"harga_modal":     hargaModal,
+			"harga_jual":      harga,
+			"warna":           warna,
+			"tahun_motor":     tahunMotor,
+			"nama_penjual":    namaPenjual,
+			"status":          status,
+			"tanggal_masuk":   tanggalMasuk,
+		})
+	}
+
+	return Response{
+		Success: true,
+		Data:    results,
+		Count:   len(results),
+	}
+}

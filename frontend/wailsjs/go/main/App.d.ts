@@ -4,11 +4,17 @@ import {main} from '../models';
 
 export function AddCapital(arg1:number,arg2:string):Promise<main.Response>;
 
-export function AddMotor(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number,arg6:string,arg7:string,arg8:string,arg9:string):Promise<main.Response>;
+export function AddMotor(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string,arg12:string):Promise<main.Response>;
 
 export function CheckNomorPolisiExists(arg1:string,arg2:string):Promise<main.Response>;
 
+export function CreateTransaction(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number,arg6:string):Promise<main.Response>;
+
 export function DeleteMotor(arg1:string):Promise<main.Response>;
+
+export function GetAvailableMotorsForSale():Promise<main.Response>;
+
+export function GetAvailableYears():Promise<main.Response>;
 
 export function GetCapitalTransactions():Promise<main.Response>;
 
@@ -22,12 +28,24 @@ export function GetMotors():Promise<main.Response>;
 
 export function GetMotorsByStatus(arg1:string):Promise<main.Response>;
 
-export function GetPendapatanBulanan():Promise<main.Response>;
+export function GetPendapatanBulanan(arg1:string):Promise<main.Response>;
+
+export function GetTodayPurchasedMotors():Promise<main.Response>;
+
+export function GetTodaySoldMotors():Promise<main.Response>;
+
+export function GetTodayStats():Promise<main.Response>;
+
+export function GetTransactions():Promise<main.Response>;
 
 export function SearchMotors(arg1:string):Promise<main.Response>;
 
+export function SearchTransactions(arg1:string,arg2:string,arg3:string):Promise<main.Response>;
+
+export function SeedData2025():Promise<main.Response>;
+
 export function SubtractCapital(arg1:number,arg2:string):Promise<main.Response>;
 
-export function UpdateMotor(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number,arg6:number,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string):Promise<main.Response>;
+export function UpdateMotor(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number,arg6:number,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string,arg12:string,arg13:string,arg14:string):Promise<main.Response>;
 
 export function UpdateMotorStatus(arg1:string,arg2:string):Promise<main.Response>;

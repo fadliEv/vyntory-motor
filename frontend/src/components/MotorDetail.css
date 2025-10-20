@@ -247,6 +247,25 @@
   gap: 20px;
 }
 
+/* Phone Link */
+.phone-link {
+  color: #F4991A;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid transparent;
+}
+
+.phone-link:hover {
+  color: #e08a0e;
+  border-bottom-color: #e08a0e;
+}
+
+/* Font Weight Utilities */
+.font-semibold {
+  font-weight: 600;
+}
+
 .system-info-item {
   display: flex;
   flex-direction: column;

@@ -5,7 +5,14 @@
       "Bash(dir /s /b \"C:\\Users\\IFG Life\\Documents\\dealer\\Sales-motor\")",
       "Bash(sqlite3 \"C:\\Users\\IFG Life\\Documents\\dealer\\Sales-motor\\dealer_motor.db\" \".schema motors\")",
       "Bash(wails dev)",
-      "Read(//c/Users/IFG Life/Documents/dealer/**)"
+      "Read(//c/Users/IFG Life/Documents/dealer/**)",
+      "Bash(go run cmd/seed/main.go)",
+      "Bash(dir /s /b \"C:\\Users\\IFG Life\\Documents\\dealer\\Sales-motor\\dealer_motor.db\")",
+      "Bash(go run insert_data.go)",
+      "Bash(go get github.com/google/uuid)",
+      "Bash(go run check_data.go)",
+      "Bash(go run full_reset.go)",
+      "Bash(git add frontend/src/components/Dashboard.css frontend/src/components/Dashboard.jsx frontend/src/components/Inventory.css frontend/src/components/Inventory.jsx frontend/src/components/Reports.css frontend/src/components/Reports.jsx)"
     ],
     "deny": [],
     "ask": []

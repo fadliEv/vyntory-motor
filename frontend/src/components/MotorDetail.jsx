@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Calendar, DollarSign, Info, TrendingUp, Package, FileText, Clock } from 'lucide-react';
+import { ArrowLeft, Calendar, DollarSign, Info, TrendingUp, Package, FileText, Clock, User, Phone, MapPin } from 'lucide-react';
 import { GetMotorByID } from '../../wailsjs/go/main/App';
 import './MotorDetail.css';
 
@@ -167,6 +167,52 @@ export default function MotorDetail({ motorId, onBack }) {
             </div>
           </div>
         </div>
+
+        {/* Informasi Penjual */}
+        {(motor.nama_penjual || motor.telepon_penjual || motor.alamat_penjual) && (
+          <div className="detail-section">
+            <div className="section-header">
+              <User size={20} />
+              <h2>Informasi Penjual</h2>
+            </div>
+
+            <div className="detail-card">
+              {motor.nama_penjual && (
+                <div className="detail-row">
+                  <div className="detail-label-icon">
+                    <User size={16} />
+                    <span>Nama Penjual</span>
+                  </div>
+                  <span className="detail-value font-semibold">{motor.nama_penjual}</span>
+                </div>
+              )}
+
+              {motor.telepon_penjual && (
+                <div className="detail-row">
+                  <div className="detail-label-icon">
+                    <Phone size={16} />
+                    <span>No. Telepon</span>
+                  </div>
+                  <span className="detail-value">
+                    <a href={`tel:${motor.telepon_penjual}`} className="phone-link">
+                      {motor.telepon_penjual}
+                    </a>
+                  </span>
+                </div>
+              )}
+
+              {motor.alamat_penjual && (
+                <div className="detail-row">
+                  <div className="detail-label-icon">
+                    <MapPin size={16} />
+                    <span>Alamat</span>
+                  </div>
+                  <span className="detail-value">{motor.alamat_penjual}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Informasi Tanggal */}
         <div className="detail-section">
