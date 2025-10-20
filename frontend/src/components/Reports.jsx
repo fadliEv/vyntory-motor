@@ -1,17 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
-import { TrendingUp, TrendingDown, Download, Zap } from 'lucide-react';
-import { GetPendapatanBulanan, GetFinancialSummary } from '../../wailsjs/go/main/App';
+import { TrendingUp, TrendingDown, Download } from 'lucide-react';
+import { GetPendapatanBulanan, GetFinancialSummary, GetAvailableYears } from '../../wailsjs/go/main/App';
 import './Reports.css';
 
 export default function Reports() {
   const [pendapatanData, setPendapatanData] = useState([]);
   const [financialData, setFinancialData] = useState(null);
+  const [availableYears, setAvailableYears] = useState([]);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadReportData();
   }, []);
+
+  useEffect(() => {
+    if (selectedYear) {
+      loadPendapatanData();
+    }
+  }, [selectedYear]);
 
   const loadReportData = async () => {
     try {
@@ -24,9 +31,10 @@ export default function Reports() {
         return;
       }
 
-      const [pendResp, finResp] = await Promise.all([
-        GetPendapatanBulanan(),
+      const [pendResp, finResp, yearsResp] = await Promise.all([
+        GetPendapatanBulanan(selectedYear),
         GetFinancialSummary(),
+        GetAvailableYears(),
       ]);
 
       if (pendResp.success) {
@@ -35,11 +43,33 @@ export default function Reports() {
       if (finResp.success) {
         setFinancialData(finResp.data);
       }
+      if (yearsResp.success) {
+        setAvailableYears(yearsResp.data || []);
+      }
     } catch (error) {
       console.error('Error loading reports:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadPendapatanData = async () => {
+    try {
+      if (!window.go || !window.go.main) {
+        return;
+      }
+
+      const pendResp = await GetPendapatanBulanan(selectedYear);
+      if (pendResp.success) {
+        setPendapatanData(pendResp.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading pendapatan data:', error);
+    }
+  };
+
+  const handleYearChange = (year) => {
+    setSelectedYear(year);
   };
 
   const formatCurrency = (value) => {
@@ -50,8 +80,31 @@ export default function Reports() {
     }).format(value);
   };
 
+  const getNamaBulanIndonesia = (bulan) => {
+    const bulanMap = {
+      '01': 'Januari', '02': 'Februari', '03': 'Maret', '04': 'April',
+      '05': 'Mei', '06': 'Juni', '07': 'Juli', '08': 'Agustus',
+      '09': 'September', '10': 'Oktober', '11': 'November', '12': 'Desember'
+    };
+    return bulanMap[bulan] || bulan;
+  };
+
   const calculateTotalRevenue = () => {
     return pendapatanData.reduce((sum, item) => sum + (item.total_penjualan || 0), 0);
+  };
+
+  const calculateTotalModal = () => {
+    return pendapatanData.reduce((sum, item) => {
+      const modal = Number(item.total_modal) || 0;
+      return sum + modal;
+    }, 0);
+  };
+
+  const calculateTotalProfit = () => {
+    return pendapatanData.reduce((sum, item) => {
+      const profit = Number(item.total_profit) || 0;
+      return sum + profit;
+    }, 0);
   };
 
   const calculateAverageRevenue = () => {
@@ -59,16 +112,24 @@ export default function Reports() {
     return calculateTotalRevenue() / pendapatanData.length;
   };
 
+  const calculateAverageProfit = () => {
+    if (pendapatanData.length === 0) return 0;
+    return calculateTotalProfit() / pendapatanData.length;
+  };
+
   const getTopMonth = () => {
     if (pendapatanData.length === 0) return null;
     return pendapatanData.reduce((max, item) =>
-      (item.total_penjualan > max.total_penjualan) ? item : max
+      (item.total_profit > max.total_profit) ? item : max
     );
   };
 
   const topMonth = getTopMonth();
   const totalRevenue = calculateTotalRevenue();
+  const totalModal = calculateTotalModal();
+  const totalProfit = calculateTotalProfit();
   const averageRevenue = calculateAverageRevenue();
+  const averageProfit = calculateAverageProfit();
 
   if (loading) {
     return (
@@ -86,86 +147,46 @@ export default function Reports() {
       {/* Summary Cards */}
       <div className="reports-summary-grid">
         <div className="reports-summary-card reports-summary-card-primary">
-          <p className="reports-summary-label">Total Pendapatan</p>
-          <p className="reports-summary-value">{formatCurrency(totalRevenue)}</p>
-          <p className="reports-summary-meta">{pendapatanData.length} bulan tersedia</p>
+          <p className="reports-summary-label">Total Modal Dikeluarkan</p>
+          <p className="reports-summary-value">{formatCurrency(totalModal)}</p>
+          <p className="reports-summary-meta">Modal untuk pembelian motor</p>
         </div>
 
         <div className="reports-summary-card reports-summary-card-dark">
-          <p className="reports-summary-label">Rata-rata Pendapatan/Bulan</p>
-          <p className="reports-summary-value">{formatCurrency(averageRevenue)}</p>
-          <p className="reports-summary-meta">Dari semua bulan</p>
+          <p className="reports-summary-label">Total Penjualan</p>
+          <p className="reports-summary-value">{formatCurrency(totalRevenue)}</p>
+          <p className="reports-summary-meta">Uang masuk dari penjualan</p>
         </div>
 
         <div className="reports-summary-card reports-summary-card-green">
-          <p className="reports-summary-label">Bulan Terbaik</p>
-          <p className="reports-summary-value" style={{ fontSize: '24px' }}>
-            {topMonth ? topMonth.bulan_nama : '-'}
-          </p>
-          <p className="reports-summary-meta">
-            {topMonth ? formatCurrency(topMonth.total_penjualan) : '-'}
-          </p>
-        </div>
-      </div>
-
-      {/* Charts */}
-      <div className="reports-charts-grid">
-        {/* Revenue Trend */}
-        <div className="reports-chart-card">
-          <h3 className="reports-chart-title">Tren Pendapatan</h3>
-          <div className="reports-chart-container">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={pendapatanData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis dataKey="bulan_tahun" stroke="#9CA3AF" />
-                <YAxis stroke="#9CA3AF" />
-                <Tooltip
-                  formatter={(value) => formatCurrency(value)}
-                  contentStyle={{ backgroundColor: '#F9F5F0', border: '1px solid #E5E7EB' }}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="total_penjualan"
-                  stroke="#F4991A"
-                  strokeWidth={3}
-                  dot={{ fill: '#F4991A', r: 6 }}
-                  activeDot={{ r: 8 }}
-                  name="Total Penjualan"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <p className="reports-summary-label">Total Profit/Laba</p>
+          <p className="reports-summary-value">{formatCurrency(totalProfit)}</p>
+          <p className="reports-summary-meta">Keuntungan bersih tahun ini</p>
         </div>
 
-        {/* Sales Volume */}
-        <div className="reports-chart-card">
-          <h3 className="reports-chart-title">Volume Penjualan Per Bulan</h3>
-          <div className="reports-chart-container">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={pendapatanData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis dataKey="bulan_tahun" stroke="#9CA3AF" />
-                <YAxis stroke="#9CA3AF" />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#F9F5F0', border: '1px solid #E5E7EB' }}
-                />
-                <Legend />
-                <Bar dataKey="jumlah_terjual" name="Unit Terjual" radius={[8, 8, 0, 0]}>
-                  {pendapatanData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#F4991A' : '#344F1F'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="reports-summary-card reports-summary-card-primary">
+          <p className="reports-summary-label">Rata-rata Profit/Bulan</p>
+          <p className="reports-summary-value">{formatCurrency(averageProfit)}</p>
+          <p className="reports-summary-meta">{pendapatanData.length} bulan data</p>
         </div>
       </div>
 
       {/* Detailed Table */}
       <div className="reports-table-section">
         <div className="reports-table-header">
-          <h3 className="reports-table-title">Laporan Penjualan Detail</h3>
+          <div className="reports-table-header-left">
+            <h3 className="reports-table-title">Laporan Penjualan Detail</h3>
+            {availableYears.length > 0 && (
+              <div className="reports-year-selector">
+                <label>Tahun:</label>
+                <select value={selectedYear} onChange={(e) => handleYearChange(e.target.value)}>
+                  {availableYears.map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
           <button className="reports-export-btn">
             <Download size={18} />
             Export CSV
@@ -176,17 +197,20 @@ export default function Reports() {
           <table className="reports-table">
             <thead className="reports-table-head">
               <tr>
-                <th className="reports-table-th">Bulan</th>
+                <th className="reports-table-th reports-table-th-center">Bulan</th>
                 <th className="reports-table-th reports-table-th-center">Unit Terjual</th>
-                <th className="reports-table-th reports-table-th-right">Total Penjualan</th>
-                <th className="reports-table-th reports-table-th-right">Rata-rata per Unit</th>
-                <th className="reports-table-th reports-table-th-right">% Kontribusi</th>
+                <th className="reports-table-th reports-table-th-center">Total Modal</th>
+                <th className="reports-table-th reports-table-th-center">Total Penjualan</th>
+                <th className="reports-table-th reports-table-th-center">Profit</th>
+                <th className="reports-table-th reports-table-th-center">% Margin</th>
               </tr>
             </thead>
             <tbody>
               {pendapatanData.map((item, idx) => {
-                const contribution = totalRevenue > 0 ? (item.total_penjualan / totalRevenue) * 100 : 0;
-                const avgPerUnit = item.jumlah_terjual > 0 ? item.total_penjualan / item.jumlah_terjual : 0;
+                const modal = Number(item.total_modal) || 0;
+                const profit = Number(item.total_profit) || 0;
+                const penjualan = Number(item.total_penjualan) || 0;
+                const profitMargin = modal > 0 ? ((profit / modal) * 100) : 0;
 
                 return (
                   <tr
@@ -195,32 +219,33 @@ export default function Reports() {
                       idx % 2 === 1 ? 'reports-table-body-row-alternate' : ''
                     }`}
                   >
-                    <td className="reports-table-td">
-                      <div className="reports-month-info">
-                        <div>
-                          <p className="reports-month-name">{item.bulan_nama}</p>
-                          <p className="reports-month-date">{item.bulan_tahun}</p>
-                        </div>
+                    <td className="reports-table-td reports-table-td-center">
+                      <div className="reports-month-info-centered">
+                        <p className="reports-month-name">{getNamaBulanIndonesia(item.bulan)}</p>
+                        <p className="reports-month-date">{item.bulan_tahun}</p>
                       </div>
                     </td>
                     <td className="reports-table-td reports-table-td-center reports-table-td-primary">
                       {item.jumlah_terjual} unit
                     </td>
-                    <td className="reports-table-td reports-table-td-right reports-table-td-accent">
-                      {formatCurrency(item.total_penjualan)}
+                    <td className="reports-table-td reports-table-td-center" style={{ color: '#dc2626' }}>
+                      {formatCurrency(modal)}
                     </td>
-                    <td className="reports-table-td reports-table-td-right reports-table-td-secondary">
-                      {formatCurrency(avgPerUnit)}
+                    <td className="reports-table-td reports-table-td-center reports-table-td-accent">
+                      {formatCurrency(penjualan)}
                     </td>
-                    <td className="reports-table-td reports-table-td-right">
-                      <div className="reports-trend-icon">
-                        {contribution >= 0 ? (
+                    <td className="reports-table-td reports-table-td-center" style={{ color: '#059669', fontWeight: '600' }}>
+                      {formatCurrency(profit)}
+                    </td>
+                    <td className="reports-table-td reports-table-td-center">
+                      <div className="reports-trend-icon-centered">
+                        {profitMargin >= 0 ? (
                           <TrendingUp size={16} color="#059669" />
                         ) : (
                           <TrendingDown size={16} color="#dc2626" />
                         )}
                         <span className="reports-table-td-primary">
-                          {contribution.toFixed(1)}%
+                          {profitMargin.toFixed(1)}%
                         </span>
                       </div>
                     </td>
@@ -231,23 +256,28 @@ export default function Reports() {
               {/* Total Row */}
               {pendapatanData.length > 0 && (
                 <tr className="reports-table-body-row-total">
-                  <td className="reports-table-td reports-table-td-total">TOTAL</td>
+                  <td className="reports-table-td reports-table-td-center reports-table-td-total">TOTAL</td>
                   <td className="reports-table-td reports-table-td-center reports-table-td-total">
                     {pendapatanData.reduce((sum, item) => sum + item.jumlah_terjual, 0)} unit
                   </td>
-                  <td className="reports-table-td reports-table-td-right reports-table-td-total">
+                  <td className="reports-table-td reports-table-td-center reports-table-td-total">
+                    {formatCurrency(totalModal)}
+                  </td>
+                  <td className="reports-table-td reports-table-td-center reports-table-td-total">
                     {formatCurrency(totalRevenue)}
                   </td>
-                  <td className="reports-table-td reports-table-td-right reports-table-td-total">
-                    {formatCurrency(averageRevenue)}
+                  <td className="reports-table-td reports-table-td-center reports-table-td-total">
+                    {formatCurrency(totalProfit)}
                   </td>
-                  <td className="reports-table-td reports-table-td-right reports-table-td-total">100.0%</td>
+                  <td className="reports-table-td reports-table-td-center reports-table-td-total">
+                    {totalModal > 0 ? ((totalProfit / totalModal) * 100).toFixed(1) : '0.0'}%
+                  </td>
                 </tr>
               )}
 
               {pendapatanData.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="reports-no-data">
+                  <td colSpan="6" className="reports-no-data">
                     Tidak ada data laporan
                   </td>
                 </tr>
@@ -260,40 +290,59 @@ export default function Reports() {
       {/* Financial Summary */}
       {financialData && (
         <div className="reports-financial-summary">
-          <h3 className="reports-financial-title">Ringkasan Keuangan Terkini</h3>
+          <h3 className="reports-financial-title">Ringkasan Keuangan {selectedYear}</h3>
           <div className="reports-financial-grid">
             <div className="reports-financial-item">
-              <span className="reports-financial-item-label">Modal Saat Ini</span>
-              <span className="reports-financial-item-value">
-                {formatCurrency(financialData.total_modal)}
+              <span className="reports-financial-item-label">Total Modal Dikeluarkan</span>
+              <span className="reports-financial-item-value" style={{ color: '#dc2626' }}>
+                {formatCurrency(Number(financialData.total_modal_dikeluarkan) || 0)}
               </span>
+              <span className="reports-financial-item-meta">Semua pembelian motor</span>
             </div>
             <div className="reports-financial-item">
-              <span className="reports-financial-item-label">Total Penjualan Semua</span>
+              <span className="reports-financial-item-label">Modal Belum Kembali</span>
+              <span className="reports-financial-item-value" style={{ color: '#D97706' }}>
+                {formatCurrency(Number(financialData.total_modal) || 0)}
+              </span>
+              <span className="reports-financial-item-meta">Motor belum terjual</span>
+            </div>
+            <div className="reports-financial-item">
+              <span className="reports-financial-item-label">Total Penjualan</span>
+              <span className="reports-financial-item-value" style={{ color: '#F4991A' }}>
+                {formatCurrency(Number(financialData.total_pendapatan) || 0)}
+              </span>
+              <span className="reports-financial-item-meta">Uang masuk dari penjualan</span>
+            </div>
+            <div className="reports-financial-item">
+              <span className="reports-financial-item-label">Total Profit</span>
               <span className="reports-financial-item-value" style={{ color: '#059669' }}>
-                {formatCurrency(financialData.total_pendapatan)}
+                {formatCurrency(Number(financialData.total_profit) || 0)}
+              </span>
+              <span className="reports-financial-item-meta">Keuntungan bersih</span>
+            </div>
+            <div className="reports-financial-item">
+              <span className="reports-financial-item-label">Penjualan Bulan Ini</span>
+              <span className="reports-financial-item-value">
+                {formatCurrency(Number(financialData.pendapatan_bulan_ini) || 0)}
+              </span>
+              <span className="reports-financial-item-meta">
+                Profit: {formatCurrency(Number(financialData.profit_bulan_ini) || 0)}
               </span>
             </div>
             <div className={`reports-financial-item ${
-              financialData.persentase_perubahan >= 0 ? 'reports-financial-item-positive' : 'reports-financial-item-negative'
+              (Number(financialData.persentase_perubahan) || 0) >= 0 ? 'reports-financial-item-positive' : 'reports-financial-item-negative'
             }`}>
-              <span className="reports-financial-item-label">Perubahan Bulan Ini</span>
+              <span className="reports-financial-item-label">Perubahan vs Bulan Lalu</span>
               <div className="reports-financial-trend-icon">
-                {financialData.persentase_perubahan >= 0 ? (
+                {(Number(financialData.persentase_perubahan) || 0) >= 0 ? (
                   <TrendingUp size={18} color="#059669" />
                 ) : (
                   <TrendingDown size={18} color="#dc2626" />
                 )}
                 <span className="reports-financial-item-value">
-                  {financialData.persentase_perubahan.toFixed(1)}%
+                  {(Number(financialData.persentase_perubahan) || 0).toFixed(1)}%
                 </span>
               </div>
-            </div>
-            <div className="reports-financial-item">
-              <span className="reports-financial-item-label">Rata-rata Harian (30 hari)</span>
-              <span className="reports-financial-item-value" style={{ color: '#D97706' }}>
-                {formatCurrency(financialData.pengeluaran_harian)}
-              </span>
             </div>
           </div>
         </div>

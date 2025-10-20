@@ -14,10 +14,10 @@
 /* Header Actions */
 .inventory-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 32px;
-  gap: 16px;
+  gap: 20px;
   flex-wrap: wrap;
 }
 
@@ -30,29 +30,91 @@
 }
 
 .inventory-search-filters {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 16px;
   flex: 1;
+  align-items: start;
+}
+
+/* Row 1 items - Search, Status, Refresh */
+.inventory-search {
+  grid-column: 1 / 2;
+  grid-row: 1;
+}
+
+.inventory-filter-select {
+  grid-column: 2 / 3;
+  grid-row: 1;
+}
+
+.inventory-refresh-btn {
+  grid-column: 3 / 4;
+  grid-row: 1;
+}
+
+/* Row 2 items - Date filter groups */
+.inventory-date-filter-group:nth-of-type(1) {
+  grid-column: 1 / 2;
+  grid-row: 2;
+}
+
+.inventory-date-filter-group:nth-of-type(2) {
+  grid-column: 2 / 4;
+  grid-row: 2;
+}
+
+@media (max-width: 1200px) {
+  .inventory-search-filters {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .inventory-search {
+    grid-column: 1 / 2;
+    grid-row: 1;
+  }
+
+  .inventory-filter-select {
+    grid-column: 2 / 3;
+    grid-row: 1;
+  }
+
+  .inventory-refresh-btn {
+    grid-column: 1 / 2;
+    grid-row: 3;
+  }
+
+  .inventory-date-filter-group:nth-of-type(1) {
+    grid-column: 1 / 2;
+    grid-row: 2;
+  }
+
+  .inventory-date-filter-group:nth-of-type(2) {
+    grid-column: 2 / 3;
+    grid-row: 2;
+  }
 }
 
 @media (max-width: 768px) {
   .inventory-search-filters {
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .inventory-search,
+  .inventory-filter-select,
+  .inventory-refresh-btn,
+  .inventory-date-filter-group:nth-of-type(1),
+  .inventory-date-filter-group:nth-of-type(2) {
+    grid-column: 1 / 2;
+    grid-row: auto;
   }
 }
 
+/* Search container - sizing handled by grid */
 .inventory-search {
-  flex: 1;
-  max-width: 400px;
-}
-
-@media (max-width: 768px) {
-  .inventory-search {
-    max-width: 100%;
-  }
+  width: 100%;
 }
 
 .inventory-search-wrapper {
@@ -124,6 +186,150 @@
   ring-color: #F4991A;
   border-color: #F4991A;
   box-shadow: 0 0 0 3px rgba(244, 153, 26, 0.1);
+}
+
+.inventory-filter-date {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 145px;
+  color: #374151;
+}
+
+.inventory-filter-date:focus {
+  outline: none;
+  ring: 2px;
+  ring-color: #F4991A;
+  border-color: #F4991A;
+  box-shadow: 0 0 0 3px rgba(244, 153, 26, 0.1);
+}
+
+.inventory-filter-date:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+  border-color: #e5e7eb;
+}
+
+@media (max-width: 768px) {
+  .inventory-filter-date {
+    width: 100%;
+  }
+}
+
+/* Date Filter Group Styles */
+.inventory-date-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  background-color: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.inventory-date-filter-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  white-space: nowrap;
+  margin-bottom: 4px;
+}
+
+.inventory-date-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inventory-date-filter-inputs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.inventory-date-shortcut-select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  background-color: white;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.inventory-date-shortcut-select:hover:not(:disabled) {
+  border-color: #F4991A;
+  color: #F4991A;
+}
+
+.inventory-date-shortcut-select:focus {
+  outline: none;
+  border-color: #F4991A;
+  box-shadow: 0 0 0 2px rgba(244, 153, 26, 0.1);
+}
+
+.inventory-date-shortcut-select:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+  border-color: #e5e7eb;
+}
+
+.inventory-date-separator {
+  font-size: 14px;
+  font-weight: 600;
+  color: #9ca3af;
+  padding: 0 2px;
+}
+
+@media (max-width: 768px) {
+  .inventory-date-filter-group {
+    width: 100%;
+    padding: 10px 12px;
+  }
+
+  .inventory-date-filter-controls {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .inventory-date-filter-inputs {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .inventory-date-shortcut-select {
+    width: 100%;
+    min-width: 100%;
+  }
+
+  .inventory-date-separator {
+    display: none;
+  }
+
+  .inventory-filter-date {
+    min-width: 100%;
+  }
+}
+
+@media (max-width: 1200px) {
+  .inventory-date-filter-group {
+    min-width: 100%;
+  }
 }
 
 .inventory-add-btn {

@@ -83,11 +83,43 @@ const formatNomorPolisi = (value) => {
   return cleaned.toUpperCase();
 };
 
+// Helper function untuk filter berdasarkan date range
+const isDateInRange = (dateString, startDate, endDate) => {
+  if (!dateString) return false;
+  if (!startDate && !endDate) return true;
+
+  const date = new Date(dateString);
+  const start = startDate ? new Date(startDate) : null;
+  const end = endDate ? new Date(endDate) : null;
+
+  // Set time to start/end of day for accurate comparison
+  if (start) start.setHours(0, 0, 0, 0);
+  if (end) end.setHours(23, 59, 59, 999);
+  date.setHours(0, 0, 0, 0);
+
+  if (start && end) {
+    return date >= start && date <= end;
+  } else if (start) {
+    return date >= start;
+  } else if (end) {
+    return date <= end;
+  }
+  return true;
+};
+
 export default function Inventory() {
   const [filteredMotors, setFilteredMotors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('semua');
+  // Separate date filters for tanggal_masuk and tanggal_keluar
+  const [tanggalMasukStart, setTanggalMasukStart] = useState('');
+  const [tanggalMasukEnd, setTanggalMasukEnd] = useState('');
+  const [tanggalKeluarStart, setTanggalKeluarStart] = useState('');
+  const [tanggalKeluarEnd, setTanggalKeluarEnd] = useState('');
+  // Shortcut filters
+  const [tanggalMasukShortcut, setTanggalMasukShortcut] = useState('');
+  const [tanggalKeluarShortcut, setTanggalKeluarShortcut] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingMotor, setEditingMotor] = useState(null);
@@ -102,6 +134,9 @@ export default function Inventory() {
     warna: '',
     tahun_motor: '',
     pajak_date: '',
+    nama_penjual: '',
+    telepon_penjual: '',
+    alamat_penjual: '',
     tanggal_masuk: new Date().toISOString().split('T')[0],
     tanggal_keluar: '',
   });
@@ -140,7 +175,7 @@ export default function Inventory() {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, tanggalMasukStart, tanggalMasukEnd, tanggalKeluarStart, tanggalKeluarEnd]);
 
   const loadMotors = async () => {
     try {
@@ -168,7 +203,33 @@ export default function Inventory() {
       }
 
       if (response.success) {
-        setFilteredMotors(response.data || []);
+        let motors = response.data || [];
+
+        // Apply date range filters di frontend - SEPARATE untuk tanggal_masuk dan tanggal_keluar
+        if (tanggalMasukStart || tanggalMasukEnd || tanggalKeluarStart || tanggalKeluarEnd) {
+          motors = motors.filter(motor => {
+            let passFilter = true;
+
+            // Filter berdasarkan tanggal_masuk (apply untuk semua motor)
+            if (tanggalMasukStart || tanggalMasukEnd) {
+              passFilter = passFilter && isDateInRange(motor.tanggal_masuk, tanggalMasukStart, tanggalMasukEnd);
+            }
+
+            // Filter berdasarkan tanggal_keluar (hanya untuk motor yang sudah ada tanggal_keluar)
+            if (tanggalKeluarStart || tanggalKeluarEnd) {
+              // Jika motor tidak punya tanggal_keluar, filter ini akan exclude motor tersebut
+              if (!motor.tanggal_keluar) {
+                passFilter = false;
+              } else {
+                passFilter = passFilter && isDateInRange(motor.tanggal_keluar, tanggalKeluarStart, tanggalKeluarEnd);
+              }
+            }
+
+            return passFilter;
+          });
+        }
+
+        setFilteredMotors(motors);
       } else {
         console.error('Error from backend:', response.message);
         setFilteredMotors([]);
@@ -229,8 +290,66 @@ export default function Inventory() {
   const handleRefresh = () => {
     setSearchTerm('');
     setStatusFilter('semua');
+    setTanggalMasukStart('');
+    setTanggalMasukEnd('');
+    setTanggalKeluarStart('');
+    setTanggalKeluarEnd('');
+    setTanggalMasukShortcut('');
+    setTanggalKeluarShortcut('');
     setCurrentPage(1);
     loadMotors();
+  };
+
+  // Handle shortcut filter untuk Tanggal Masuk
+  const handleTanggalMasukShortcut = (shortcut) => {
+    setTanggalMasukShortcut(shortcut);
+    const today = new Date();
+
+    // Reset filter Tanggal Keluar (mutual exclusive)
+    setTanggalKeluarStart('');
+    setTanggalKeluarEnd('');
+    setTanggalKeluarShortcut('');
+
+    if (shortcut === 'hari-ini') {
+      const todayStr = today.toISOString().split('T')[0];
+      setTanggalMasukStart(todayStr);
+      setTanggalMasukEnd(todayStr);
+    } else if (shortcut === 'bulan-ini') {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      setTanggalMasukStart(firstDay.toISOString().split('T')[0]);
+      setTanggalMasukEnd(lastDay.toISOString().split('T')[0]);
+    } else {
+      // Reset jika pilih "Pilih Shortcut"
+      setTanggalMasukStart('');
+      setTanggalMasukEnd('');
+    }
+  };
+
+  // Handle shortcut filter untuk Tanggal Keluar
+  const handleTanggalKeluarShortcut = (shortcut) => {
+    setTanggalKeluarShortcut(shortcut);
+    const today = new Date();
+
+    // Reset filter Tanggal Masuk (mutual exclusive)
+    setTanggalMasukStart('');
+    setTanggalMasukEnd('');
+    setTanggalMasukShortcut('');
+
+    if (shortcut === 'hari-ini') {
+      const todayStr = today.toISOString().split('T')[0];
+      setTanggalKeluarStart(todayStr);
+      setTanggalKeluarEnd(todayStr);
+    } else if (shortcut === 'bulan-ini') {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      setTanggalKeluarStart(firstDay.toISOString().split('T')[0]);
+      setTanggalKeluarEnd(lastDay.toISOString().split('T')[0]);
+    } else {
+      // Reset jika pilih "Pilih Shortcut"
+      setTanggalKeluarStart('');
+      setTanggalKeluarEnd('');
+    }
   };
 
   const handleAddMotor = async (e) => {
@@ -258,6 +377,9 @@ export default function Inventory() {
         formData.warna,
         formData.tahun_motor,
         formData.pajak_date,
+        formData.nama_penjual,
+        formData.telepon_penjual,
+        formData.alamat_penjual,
         formData.tanggal_masuk
       );
 
@@ -314,6 +436,9 @@ export default function Inventory() {
         formData.warna,
         formData.tahun_motor,
         formData.pajak_date,
+        formData.nama_penjual,
+        formData.telepon_penjual,
+        formData.alamat_penjual,
         formData.tanggal_masuk,
         formData.tanggal_keluar
       );
@@ -417,6 +542,9 @@ export default function Inventory() {
       warna: motor.warna || '',
       tahun_motor: motor.tahun_motor || '',
       pajak_date: motor.pajak_date || '',
+      nama_penjual: motor.nama_penjual || '',
+      telepon_penjual: motor.telepon_penjual || '',
+      alamat_penjual: motor.alamat_penjual || '',
       tanggal_masuk: formatTanggal(motor.tanggal_masuk),
       tanggal_keluar: formatTanggal(motor.tanggal_keluar) !== '-' ? formatTanggal(motor.tanggal_keluar) : '',
     });
@@ -515,6 +643,110 @@ export default function Inventory() {
               <option key={status.value} value={status.value}>{status.label}</option>
             ))}
           </select>
+
+          {/* Tanggal Masuk (Beli) Filter */}
+          <div className="inventory-date-filter-group">
+            <label className="inventory-date-filter-label">Tgl Masuk (Beli):</label>
+            <div className="inventory-date-filter-controls">
+              <div className="inventory-date-filter-inputs">
+                <input
+                  type="date"
+                  value={tanggalMasukStart}
+                  onChange={(e) => {
+                    setTanggalMasukStart(e.target.value);
+                    setTanggalMasukShortcut(''); // Reset shortcut saat manual input
+                    // Reset filter Tanggal Keluar (mutual exclusive)
+                    setTanggalKeluarStart('');
+                    setTanggalKeluarEnd('');
+                    setTanggalKeluarShortcut('');
+                  }}
+                  className="inventory-filter-date"
+                  placeholder="Dari"
+                  title="Tanggal Masuk - Dari"
+                  disabled={tanggalKeluarStart || tanggalKeluarEnd}
+                />
+                <span className="inventory-date-separator">-</span>
+                <input
+                  type="date"
+                  value={tanggalMasukEnd}
+                  onChange={(e) => {
+                    setTanggalMasukEnd(e.target.value);
+                    setTanggalMasukShortcut(''); // Reset shortcut saat manual input
+                    // Reset filter Tanggal Keluar (mutual exclusive)
+                    setTanggalKeluarStart('');
+                    setTanggalKeluarEnd('');
+                    setTanggalKeluarShortcut('');
+                  }}
+                  className="inventory-filter-date"
+                  placeholder="Sampai"
+                  title="Tanggal Masuk - Sampai"
+                  disabled={tanggalKeluarStart || tanggalKeluarEnd}
+                />
+              </div>
+              <select
+                value={tanggalMasukShortcut}
+                onChange={(e) => handleTanggalMasukShortcut(e.target.value)}
+                className="inventory-date-shortcut-select"
+                disabled={tanggalKeluarStart || tanggalKeluarEnd}
+              >
+                <option value="">Shortcut</option>
+                <option value="hari-ini">Hari Ini</option>
+                <option value="bulan-ini">Bulan Ini</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Tanggal Keluar (Jual) Filter */}
+          <div className="inventory-date-filter-group">
+            <label className="inventory-date-filter-label">Tgl Keluar (Jual):</label>
+            <div className="inventory-date-filter-controls">
+              <div className="inventory-date-filter-inputs">
+                <input
+                  type="date"
+                  value={tanggalKeluarStart}
+                  onChange={(e) => {
+                    setTanggalKeluarStart(e.target.value);
+                    setTanggalKeluarShortcut(''); // Reset shortcut saat manual input
+                    // Reset filter Tanggal Masuk (mutual exclusive)
+                    setTanggalMasukStart('');
+                    setTanggalMasukEnd('');
+                    setTanggalMasukShortcut('');
+                  }}
+                  className="inventory-filter-date"
+                  placeholder="Dari"
+                  title="Tanggal Keluar - Dari"
+                  disabled={tanggalMasukStart || tanggalMasukEnd}
+                />
+                <span className="inventory-date-separator">-</span>
+                <input
+                  type="date"
+                  value={tanggalKeluarEnd}
+                  onChange={(e) => {
+                    setTanggalKeluarEnd(e.target.value);
+                    setTanggalKeluarShortcut(''); // Reset shortcut saat manual input
+                    // Reset filter Tanggal Masuk (mutual exclusive)
+                    setTanggalMasukStart('');
+                    setTanggalMasukEnd('');
+                    setTanggalMasukShortcut('');
+                  }}
+                  className="inventory-filter-date"
+                  placeholder="Sampai"
+                  title="Tanggal Keluar - Sampai"
+                  disabled={tanggalMasukStart || tanggalMasukEnd}
+                />
+              </div>
+              <select
+                value={tanggalKeluarShortcut}
+                onChange={(e) => handleTanggalKeluarShortcut(e.target.value)}
+                className="inventory-date-shortcut-select"
+                disabled={tanggalMasukStart || tanggalMasukEnd}
+              >
+                <option value="">Shortcut</option>
+                <option value="hari-ini">Hari Ini</option>
+                <option value="bulan-ini">Bulan Ini</option>
+              </select>
+            </div>
+          </div>
 
           <button onClick={handleRefresh} className="inventory-refresh-btn" title="Refresh & Reset Filter">
             Refresh
@@ -724,7 +956,7 @@ export default function Inventory() {
               </div>
 
               <div className="inventory-form-group">
-                <label className="inventory-form-label">Harga Jual *</label>
+                <label className="inventory-form-label">Harga Jual</label>
                 <div className="inventory-form-harga-wrapper">
                   <span className="inventory-form-harga-prefix">Rp</span>
                   <input
@@ -733,23 +965,21 @@ export default function Inventory() {
                     onChange={(e) => setFormData({ ...formData, harga: formatHargaInput(e.target.value) })}
                     className="inventory-form-input inventory-form-harga-input"
                     placeholder="0"
-                    required
                   />
                 </div>
-                <span className="inventory-form-helper-text">Harga jual kepada customer</span>
+                <span className="inventory-form-helper-text">Harga jual kepada customer (opsional)</span>
               </div>
 
               <div className="inventory-form-group">
-                <label className="inventory-form-label">Warna *</label>
+                <label className="inventory-form-label">Warna</label>
                 <input
                   type="text"
                   value={formData.warna}
                   onChange={(e) => setFormData({ ...formData, warna: e.target.value })}
                   className="inventory-form-input"
                   placeholder="Contoh: Merah"
-                  required
                 />
-                <span className="inventory-form-helper-text">Warna motor</span>
+                <span className="inventory-form-helper-text">Warna motor (opsional)</span>
               </div>
 
               <div className="inventory-form-group">
@@ -769,19 +999,54 @@ export default function Inventory() {
               </div>
 
               <div className="inventory-form-group">
-                <label className="inventory-form-label">Pajak Date (Tahun) *</label>
+                <label className="inventory-form-label">Pajak Date (Tahun)</label>
                 <select
                   value={formData.pajak_date}
                   onChange={(e) => setFormData({ ...formData, pajak_date: e.target.value })}
                   className="inventory-form-select"
-                  required
                 >
                   <option value="">Pilih Tahun Pajak</option>
                   {generatePajakYearOptions().map(year => (
                     <option key={year} value={year}>{year}</option>
                   ))}
                 </select>
-                <span className="inventory-form-helper-text">Tahun pajak (jika kurang dari tahun sekarang = Pajak Mati)</span>
+                <span className="inventory-form-helper-text">Tahun pajak (opsional)</span>
+              </div>
+
+              <div className="inventory-form-group">
+                <label className="inventory-form-label">Nama Penjual</label>
+                <input
+                  type="text"
+                  value={formData.nama_penjual}
+                  onChange={(e) => setFormData({ ...formData, nama_penjual: e.target.value })}
+                  className="inventory-form-input"
+                  placeholder="Contoh: Toko Motor Jaya / Budi Santoso"
+                />
+                <span className="inventory-form-helper-text">Nama toko/perorangan yang menjual motor (opsional)</span>
+              </div>
+
+              <div className="inventory-form-group">
+                <label className="inventory-form-label">No. Telepon Penjual</label>
+                <input
+                  type="text"
+                  value={formData.telepon_penjual}
+                  onChange={(e) => setFormData({ ...formData, telepon_penjual: e.target.value })}
+                  className="inventory-form-input"
+                  placeholder="Contoh: 081234567890"
+                />
+                <span className="inventory-form-helper-text">Nomor telepon penjual (opsional)</span>
+              </div>
+
+              <div className="inventory-form-group">
+                <label className="inventory-form-label">Alamat Penjual</label>
+                <textarea
+                  value={formData.alamat_penjual}
+                  onChange={(e) => setFormData({ ...formData, alamat_penjual: e.target.value })}
+                  className="inventory-form-input"
+                  placeholder="Contoh: Jl. Raya Motor No. 123, Jakarta"
+                  rows="3"
+                />
+                <span className="inventory-form-helper-text">Alamat lengkap penjual (opsional)</span>
               </div>
 
               <div className="inventory-form-group">
