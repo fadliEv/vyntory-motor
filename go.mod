@@ -2,10 +2,7 @@ module motor-sales
 
 go 1.23
 
-require (
-	github.com/mattn/go-sqlite3 v1.14.32
-	github.com/wailsapp/wails/v2 v2.10.2
-)
+require github.com/wailsapp/wails/v2 v2.10.2
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect

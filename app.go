@@ -30,27 +30,33 @@ func (a *App) startup(ctx context.Context) {
 		log.Fatal("Failed to initialize database:", err)
 	}
 
+	// Ensure documents folder exists
+	err = a.EnsureDocumentsFolder()
+	if err != nil {
+		log.Printf("⚠️  Warning: Failed to create documents folder: %v", err)
+	}
+
 	fmt.Println("Dealer Motor Management App started with SQLite!")
 }
 
 // Motor model
 type Motor struct {
-	ID               string    `json:"id"`
-	NamaMotor        string    `json:"nama_motor"`
-	NomorPolisi      string    `json:"nomor_polisi"`
-	Status           string    `json:"status"`
-	HargaModal       float64   `json:"harga_modal"`     // Harga beli/modal
-	Harga            float64   `json:"harga"`           // Harga jual
-	Warna            string    `json:"warna"`
-	TahunMotor       string    `json:"tahun_motor"`     // Tahun produksi/release motor
-	PajakDate        string    `json:"pajak_date"`      // Format: "2026"
-	NamaPenjual      string    `json:"nama_penjual"`      // Nama penjual (toko/perorangan)
-	TeleponPenjual   string    `json:"telepon_penjual"`   // No telepon penjual
-	AlamatPenjual    string    `json:"alamat_penjual"`    // Alamat penjual
-	TanggalMasuk     string    `json:"tanggal_masuk"`
-	TanggalKeluar    string    `json:"tanggal_keluar,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID             string    `json:"id"`
+	NamaMotor      string    `json:"nama_motor"`
+	NomorPolisi    string    `json:"nomor_polisi"`
+	Status         string    `json:"status"`
+	HargaModal     float64   `json:"harga_modal"` // Harga beli/modal
+	Harga          float64   `json:"harga"`       // Harga jual
+	Warna          string    `json:"warna"`
+	TahunMotor     string    `json:"tahun_motor"`     // Tahun produksi/release motor
+	PajakDate      string    `json:"pajak_date"`      // Format: "2026"
+	NamaPenjual    string    `json:"nama_penjual"`    // Nama penjual (toko/perorangan)
+	TeleponPenjual string    `json:"telepon_penjual"` // No telepon penjual
+	AlamatPenjual  string    `json:"alamat_penjual"`  // Alamat penjual
+	TanggalMasuk   string    `json:"tanggal_masuk"`
+	TanggalKeluar  string    `json:"tanggal_keluar,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type Capital struct {
@@ -66,24 +72,24 @@ type CapitalTransaction struct {
 	BalanceBefore   float64   `json:"balance_before"`
 	BalanceAfter    float64   `json:"balance_after"`
 	Description     string    `json:"description"`
-	ReferenceType   string    `json:"reference_type"`   // 'motor_purchase', 'manual_add', 'manual_subtract'
-	ReferenceID     string    `json:"reference_id"`     // Motor ID jika dari pembelian motor
+	ReferenceType   string    `json:"reference_type"` // 'motor_purchase', 'manual_add', 'manual_subtract'
+	ReferenceID     string    `json:"reference_id"`   // Motor ID jika dari pembelian motor
 	CreatedAt       time.Time `json:"created_at"`
 }
 
 type Transaction struct {
-	ID                string    `json:"id"`
-	InvoiceNumber     string    `json:"invoice_number"`      // Invoice number format: INV/YYYY/MM/XXXXXX
-	MotorID           string    `json:"motor_id"`
-	MotorNama         string    `json:"motor_nama"`          // Denormalized for easier display
-	MotorNomorPolisi  string    `json:"motor_nomor_polisi"`  // Denormalized for easier display
-	CustomerName      string    `json:"customer_name"`
-	CustomerPhone     string    `json:"customer_phone"`
-	CustomerAddress   string    `json:"customer_address"`
-	HargaBeli         float64   `json:"harga_beli"`          // Harga yang dibayar customer (bisa beda karena nego)
-	TanggalTransaksi  string    `json:"tanggal_transaksi"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID               string    `json:"id"`
+	InvoiceNumber    string    `json:"invoice_number"` // Invoice number format: INV/YYYY/MM/XXXXXX
+	MotorID          string    `json:"motor_id"`
+	MotorNama        string    `json:"motor_nama"`         // Denormalized for easier display
+	MotorNomorPolisi string    `json:"motor_nomor_polisi"` // Denormalized for easier display
+	CustomerName     string    `json:"customer_name"`
+	CustomerPhone    string    `json:"customer_phone"`
+	CustomerAddress  string    `json:"customer_address"`
+	HargaBeli        float64   `json:"harga_beli"` // Harga yang dibayar customer (bisa beda karena nego)
+	TanggalTransaksi string    `json:"tanggal_transaksi"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type Response struct {
@@ -92,6 +98,36 @@ type Response struct {
 	Data    interface{} `json:"data,omitempty"`
 	Count   int         `json:"count,omitempty"`
 }
+
+// MotorDocument model for document management
+type MotorDocument struct {
+	ID           string    `json:"id"`
+	MotorID      string    `json:"motor_id"`
+	DocumentType string    `json:"document_type"`
+	FileName     string    `json:"file_name"`
+	FilePath     string    `json:"file_path"`
+	FileSize     int64     `json:"file_size"`
+	MimeType     string    `json:"mime_type"`
+	UploadedAt   time.Time `json:"uploaded_at"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// Document type constants
+const (
+	DOC_TYPE_BPKB     = "bpkb"
+	DOC_TYPE_STNK     = "stnk"
+	DOC_TYPE_FAKTUR   = "faktur"
+	DOC_TYPE_KWITANSI = "kwitansi"
+	DOC_TYPE_KTP      = "ktp"
+	DOC_TYPE_FOTO     = "foto"
+	DOC_TYPE_LAINNYA  = "lainnya"
+)
+
+// File constraints
+const (
+	MAX_FILE_SIZE       = 10 * 1024 * 1024 // 10MB
+	MAX_FILES_PER_MOTOR = 10
+)
 
 // Database initialization
 func (a *App) initDatabase() error {
@@ -299,6 +335,23 @@ func (a *App) initDatabase() error {
 	CREATE INDEX IF NOT EXISTS idx_transactions_customer_name ON transactions(customer_name);
 	CREATE INDEX IF NOT EXISTS idx_transactions_customer_phone ON transactions(customer_phone);
 	CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(tanggal_transaksi);
+
+	-- Table untuk menyimpan metadata dokumen motor
+	CREATE TABLE IF NOT EXISTS motor_documents (
+		id TEXT PRIMARY KEY,
+		motor_id TEXT NOT NULL,
+		document_type TEXT NOT NULL CHECK(document_type IN ('bpkb', 'stnk', 'faktur', 'kwitansi', 'ktp', 'foto', 'lainnya')),
+		file_name TEXT NOT NULL,
+		file_path TEXT NOT NULL,
+		file_size INTEGER NOT NULL,
+		mime_type TEXT NOT NULL,
+		uploaded_at DATETIME NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (motor_id) REFERENCES motors(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_motor_documents_motor ON motor_documents(motor_id);
+	CREATE INDEX IF NOT EXISTS idx_motor_documents_type ON motor_documents(document_type);
 	`
 
 	_, err = a.db.Exec(createTableSQL)
@@ -441,9 +494,9 @@ func ptrString(s string) *string {
 // Helper function to check if string contains substring
 func contains(str, substr string) bool {
 	return len(str) > 0 && len(substr) > 0 &&
-		   (str == substr || len(str) >= len(substr) &&
-		   (str[:len(substr)] == substr || str[len(str)-len(substr):] == substr ||
-		   containsMiddle(str, substr)))
+		(str == substr || len(str) >= len(substr) &&
+			(str[:len(substr)] == substr || str[len(str)-len(substr):] == substr ||
+				containsMiddle(str, substr)))
 }
 
 // Helper to check substring in middle
@@ -989,6 +1042,13 @@ func (a *App) DeleteMotor(id string) Response {
 		}
 	}
 
+	// Cleanup documents first
+	err := a.CleanupMotorDocuments(id)
+	if err != nil {
+		fmt.Printf("⚠️  Warning: Failed to cleanup documents: %v\n", err)
+		// Continue with motor deletion even if cleanup fails
+	}
+
 	result, err := a.db.Exec("DELETE FROM motors WHERE id = ?", id)
 	if err != nil {
 		return Response{
@@ -1089,7 +1149,7 @@ func (a *App) CheckNomorPolisiExists(nomorPolisi string, excludeID string) Respo
 	return Response{
 		Success: true,
 		Data: map[string]interface{}{
-			"exists": exists,
+			"exists":       exists,
 			"nomor_polisi": nomorPolisi,
 		},
 	}
@@ -1358,9 +1418,9 @@ func (a *App) GetFinancialSummary() Response {
 
 	summary := map[string]interface{}{
 		"total_modal_dikeluarkan": totalModalDikeluarkan, // Total modal yang sudah dibeli (semua motor)
-		"total_modal":             totalModalSaatIni,      // Modal yang belum kembali (motor belum terjual)
-		"total_pendapatan":        totalPendapatan,        // Total uang masuk dari penjualan
-		"total_profit":            totalProfit,            // Total keuntungan
+		"total_modal":             totalModalSaatIni,     // Modal yang belum kembali (motor belum terjual)
+		"total_pendapatan":        totalPendapatan,       // Total uang masuk dari penjualan
+		"total_profit":            totalProfit,           // Total keuntungan
 		"pendapatan_bulan_ini":    pendapatanBulanIni,
 		"profit_bulan_ini":        profitBulanIni,
 		"pendapatan_bulan_lalu":   pendapatanBulanLalu,
@@ -1461,19 +1521,19 @@ func (a *App) GetFinancialSummaryByYear(tahun string) Response {
 	}
 
 	summary := map[string]interface{}{
-		"total_modal_dikeluarkan":      totalModalDikeluarkan,      // Total modal yang sudah dibeli pada tahun tertentu
-		"total_modal":                  totalModalSaatIni,          // Modal yang belum kembali (motor belum terjual)
-		"total_harga_jual_inventory":   totalHargaJualInventory,    // Total harga jual semua motor di inventory
-		"total_harga_modal_inventory":  totalHargaModalInventory,   // Total harga modal semua motor di inventory
-		"total_pendapatan":             totalPendapatan,            // Total uang masuk dari penjualan pada tahun tertentu
-		"total_profit":                 totalProfit,                // Total keuntungan pada tahun tertentu
-		"pendapatan_bulan_ini":         pendapatanBulanIni,
-		"profit_bulan_ini":             profitBulanIni,
-		"pendapatan_bulan_lalu":        pendapatanBulanLalu,
-		"profit_bulan_lalu":            profitBulanLalu,
-		"persentase_perubahan":         persentasePerubahan,
-		"tahun":                        tahun,
-		"updated_at":                   time.Now().Format("2006-01-02 15:04:05"),
+		"total_modal_dikeluarkan":     totalModalDikeluarkan,    // Total modal yang sudah dibeli pada tahun tertentu
+		"total_modal":                 totalModalSaatIni,        // Modal yang belum kembali (motor belum terjual)
+		"total_harga_jual_inventory":  totalHargaJualInventory,  // Total harga jual semua motor di inventory
+		"total_harga_modal_inventory": totalHargaModalInventory, // Total harga modal semua motor di inventory
+		"total_pendapatan":            totalPendapatan,          // Total uang masuk dari penjualan pada tahun tertentu
+		"total_profit":                totalProfit,              // Total keuntungan pada tahun tertentu
+		"pendapatan_bulan_ini":        pendapatanBulanIni,
+		"profit_bulan_ini":            profitBulanIni,
+		"pendapatan_bulan_lalu":       pendapatanBulanLalu,
+		"profit_bulan_lalu":           profitBulanLalu,
+		"persentase_perubahan":        persentasePerubahan,
+		"tahun":                       tahun,
+		"updated_at":                  time.Now().Format("2006-01-02 15:04:05"),
 	}
 
 	return Response{
@@ -1702,9 +1762,9 @@ func (a *App) GetCapitalTransactions() Response {
 // 	fmt.Println("🔍 DebugMotorsTerjual: Mengecek semua motor terjual...")
 
 // 	query := `
-// 	SELECT id, nama_motor, nomor_polisi, harga, tanggal_masuk, tanggal_keluar 
-// 	FROM motors 
-// 	WHERE status = 'terjual' 
+// 	SELECT id, nama_motor, nomor_polisi, harga, tanggal_masuk, tanggal_keluar
+// 	FROM motors
+// 	WHERE status = 'terjual'
 // 	ORDER BY tanggal_keluar DESC
 // 	`
 
@@ -2116,17 +2176,17 @@ func (a *App) GetTodayStats() Response {
 	`, today).Scan(&modalMasukManual, &modalKeluarManual)
 
 	stats := map[string]interface{}{
-		"tanggal":               today,
-		"motors_terjual":        motorsTerjualHariIni,
-		"pendapatan":            pendapatanHariIni,
-		"profit":                profitHariIni,
-		"motors_dibeli":         motorsBeliHariIni,
+		"tanggal":                today,
+		"motors_terjual":         motorsTerjualHariIni,
+		"pendapatan":             pendapatanHariIni,
+		"profit":                 profitHariIni,
+		"motors_dibeli":          motorsBeliHariIni,
 		"modal_keluar_pembelian": modalKeluarHariIni,
-		"modal_masuk_manual":    modalMasukManual,
-		"modal_keluar_manual":   modalKeluarManual,
-		"total_modal_keluar":    modalKeluarHariIni + modalKeluarManual,
-		"total_modal_masuk":     modalMasukManual,
-		"net_cashflow":          pendapatanHariIni + modalMasukManual - (modalKeluarHariIni + modalKeluarManual),
+		"modal_masuk_manual":     modalMasukManual,
+		"modal_keluar_manual":    modalKeluarManual,
+		"total_modal_keluar":     modalKeluarHariIni + modalKeluarManual,
+		"total_modal_masuk":      modalMasukManual,
+		"net_cashflow":           pendapatanHariIni + modalMasukManual - (modalKeluarHariIni + modalKeluarManual),
 	}
 
 	return Response{
@@ -2174,16 +2234,16 @@ func (a *App) GetTodaySoldMotors() Response {
 		}
 
 		results = append(results, map[string]interface{}{
-			"id":                id,
-			"invoice_number":    invoiceNumber,
-			"motor_nama":        motorNama,
+			"id":                 id,
+			"invoice_number":     invoiceNumber,
+			"motor_nama":         motorNama,
 			"motor_nomor_polisi": motorNopol,
-			"customer_name":     customerName,
-			"harga_beli":        hargaBeli,
-			"harga_modal":       hargaModal,
-			"profit":            profit,
-			"tanggal_transaksi": tanggalTransaksi,
-			"tanggal_keluar":    tanggalKeluar,
+			"customer_name":      customerName,
+			"harga_beli":         hargaBeli,
+			"harga_modal":        hargaModal,
+			"profit":             profit,
+			"tanggal_transaksi":  tanggalTransaksi,
+			"tanggal_keluar":     tanggalKeluar,
 		})
 	}
 
@@ -2227,16 +2287,16 @@ func (a *App) GetTodayPurchasedMotors() Response {
 		}
 
 		results = append(results, map[string]interface{}{
-			"id":              id,
-			"nama_motor":      namaMotor,
-			"nomor_polisi":    nopol,
-			"harga_modal":     hargaModal,
-			"harga_jual":      harga,
-			"warna":           warna,
-			"tahun_motor":     tahunMotor,
-			"nama_penjual":    namaPenjual,
-			"status":          status,
-			"tanggal_masuk":   tanggalMasuk,
+			"id":            id,
+			"nama_motor":    namaMotor,
+			"nomor_polisi":  nopol,
+			"harga_modal":   hargaModal,
+			"harga_jual":    harga,
+			"warna":         warna,
+			"tahun_motor":   tahunMotor,
+			"nama_penjual":  namaPenjual,
+			"status":        status,
+			"tanggal_masuk": tanggalMasuk,
 		})
 	}
 
@@ -2245,4 +2305,57 @@ func (a *App) GetTodayPurchasedMotors() Response {
 		Data:    results,
 		Count:   len(results),
 	}
+}
+
+// ==================== Document Management Helper Functions ====================
+
+// GetDocumentsBasePath returns the base path for documents storage
+// Path: {parent_dir}/vyntory-motor-documents/
+func (a *App) GetDocumentsBasePath() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Printf("Error getting working directory: %v", err)
+		return ""
+	}
+
+	// Go up one level from project folder
+	parentDir := filepath.Dir(wd)
+
+	// Documents folder sejajar dengan project
+	docsPath := filepath.Join(parentDir, "vyntory-motor-documents")
+
+	return docsPath
+}
+
+// GetMotorDocumentsPath returns the path for a specific motor's documents
+// Path: {base_path}/motors/{motor_id}/
+func (a *App) GetMotorDocumentsPath(motorID string) string {
+	basePath := a.GetDocumentsBasePath()
+	motorPath := filepath.Join(basePath, "motors", motorID)
+	return motorPath
+}
+
+// EnsureDocumentsFolder creates the documents folder structure if it doesn't exist
+func (a *App) EnsureDocumentsFolder() error {
+	basePath := a.GetDocumentsBasePath()
+	motorsPath := filepath.Join(basePath, "motors")
+
+	// Create motors folder
+	if err := os.MkdirAll(motorsPath, 0755); err != nil {
+		return fmt.Errorf("failed to create documents folder: %w", err)
+	}
+
+	fmt.Printf("📁 Documents folder ready: %s\n", basePath)
+	return nil
+}
+
+// EnsureMotorFolder creates a folder for a specific motor if it doesn't exist
+func (a *App) EnsureMotorFolder(motorID string) error {
+	motorPath := a.GetMotorDocumentsPath(motorID)
+
+	if err := os.MkdirAll(motorPath, 0755); err != nil {
+		return fmt.Errorf("failed to create motor folder: %w", err)
+	}
+
+	return nil
 }

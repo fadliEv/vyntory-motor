@@ -12,7 +12,8 @@
       "Bash(go get github.com/google/uuid)",
       "Bash(go run check_data.go)",
       "Bash(go run full_reset.go)",
-      "Bash(git add frontend/src/components/Dashboard.css frontend/src/components/Dashboard.jsx frontend/src/components/Inventory.css frontend/src/components/Inventory.jsx frontend/src/components/Reports.css frontend/src/components/Reports.jsx)"
+      "Bash(git add frontend/src/components/Dashboard.css frontend/src/components/Dashboard.jsx frontend/src/components/Inventory.css frontend/src/components/Inventory.jsx frontend/src/components/Reports.css frontend/src/components/Reports.jsx)",
+      "Bash(sqlite3:*)"
     ],
     "deny": [],
     "ask": []

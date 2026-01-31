@@ -40,7 +40,7 @@ export default function Header({ currentPage, onMenuClick, sidebarOpen }) {
         {/* Center Section - Branding */}
         <div className="header-center-section">
           <div className="header-brand">
-            <span className="header-brand-name">Cupet Motor</span>
+            <span className="header-brand-name">Vyntory Motor</span>
             <span className="header-brand-separator">|</span>
             <span className="header-brand-subtitle">Dealer Management System</span>
           </div>

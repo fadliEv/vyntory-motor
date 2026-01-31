@@ -8,7 +8,7 @@
 
 /* Watermark - Large diagonal background */
 .inventory-container::before {
-  content: 'LICENSED TO: CUPET MOTOR';
+  content: 'LICENSED TO: VYNTORY MOTOR';
   position: fixed;
   top: 50%;
   left: 50%;
@@ -24,7 +24,7 @@
 
 /* Watermark - Small footer badge */
 .inventory-container::after {
-  content: 'CUPET MOTOR';
+  content: 'VYNTORY MOTOR';
   position: fixed;
   bottom: 20px;
   right: 30px;
@@ -723,6 +723,7 @@
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -887,6 +888,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -965,4 +967,21 @@
 
 .inventory-table-body-row .inventory-table-td:last-child {
   box-shadow: -2px 0 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Form Section for Document Management */
+.inventory-form-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 2px solid #e5e7eb;
+}
+
+.inventory-form-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #344F1F;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }

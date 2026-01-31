@@ -14,12 +14,28 @@ export function CheckNomorPolisiExists(arg1, arg2) {
   return window['go']['main']['App']['CheckNomorPolisiExists'](arg1, arg2);
 }
 
+export function CleanupMotorDocuments(arg1) {
+  return window['go']['main']['App']['CleanupMotorDocuments'](arg1);
+}
+
 export function CreateTransaction(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['App']['CreateTransaction'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function DeleteMotor(arg1) {
   return window['go']['main']['App']['DeleteMotor'](arg1);
+}
+
+export function DeleteMotorDocument(arg1) {
+  return window['go']['main']['App']['DeleteMotorDocument'](arg1);
+}
+
+export function EnsureDocumentsFolder() {
+  return window['go']['main']['App']['EnsureDocumentsFolder']();
+}
+
+export function EnsureMotorFolder(arg1) {
+  return window['go']['main']['App']['EnsureMotorFolder'](arg1);
 }
 
 export function GetAvailableMotorsForSale() {
@@ -38,12 +54,32 @@ export function GetCurrentCapital() {
   return window['go']['main']['App']['GetCurrentCapital']();
 }
 
+export function GetDocumentsBasePath() {
+  return window['go']['main']['App']['GetDocumentsBasePath']();
+}
+
 export function GetFinancialSummary() {
   return window['go']['main']['App']['GetFinancialSummary']();
 }
 
+export function GetFinancialSummaryByYear(arg1) {
+  return window['go']['main']['App']['GetFinancialSummaryByYear'](arg1);
+}
+
 export function GetMotorByID(arg1) {
   return window['go']['main']['App']['GetMotorByID'](arg1);
+}
+
+export function GetMotorDocumentFile(arg1) {
+  return window['go']['main']['App']['GetMotorDocumentFile'](arg1);
+}
+
+export function GetMotorDocuments(arg1) {
+  return window['go']['main']['App']['GetMotorDocuments'](arg1);
+}
+
+export function GetMotorDocumentsPath(arg1) {
+  return window['go']['main']['App']['GetMotorDocumentsPath'](arg1);
 }
 
 export function GetMotors() {
@@ -82,10 +118,6 @@ export function SearchTransactions(arg1, arg2, arg3) {
   return window['go']['main']['App']['SearchTransactions'](arg1, arg2, arg3);
 }
 
-export function SeedData2025() {
-  return window['go']['main']['App']['SeedData2025']();
-}
-
 export function SubtractCapital(arg1, arg2) {
   return window['go']['main']['App']['SubtractCapital'](arg1, arg2);
 }
@@ -96,4 +128,8 @@ export function UpdateMotor(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9
 
 export function UpdateMotorStatus(arg1, arg2) {
   return window['go']['main']['App']['UpdateMotorStatus'](arg1, arg2);
+}
+
+export function UploadMotorDocument(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['UploadMotorDocument'](arg1, arg2, arg3, arg4);
 }

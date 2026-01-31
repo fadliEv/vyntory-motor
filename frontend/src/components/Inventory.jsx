@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Edit2, Trash2, Search, RefreshCw, Eye } from 'lucide-react';
-import { GetMotors, SearchMotors, GetMotorsByStatus, CheckNomorPolisiExists, AddMotor, UpdateMotor, DeleteMotor } from '../../wailsjs/go/main/App';
+import { GetMotors, SearchMotors, GetMotorsByStatus, CheckNomorPolisiExists, AddMotor, UpdateMotor, DeleteMotor, UploadMotorDocument, GetMotorDocuments, GetMotorDocumentFile, DeleteMotorDocument } from '../../wailsjs/go/main/App';
 import { AlertModal, ConfirmModal } from './Modal';
 import MotorDetail from './MotorDetail';
+import DocumentUploader from './DocumentUploader';
+import DocumentList from './DocumentList';
+import DocumentPreview from './DocumentPreview';
 import './Inventory.css';
 
 // Constants
@@ -148,6 +151,21 @@ export default function Inventory() {
   // Detail View State
   const [showDetail, setShowDetail] = useState(false);
   const [selectedMotorId, setSelectedMotorId] = useState(null);
+
+  // Document Upload State
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [existingDocuments, setExistingDocuments] = useState([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+
+  // Document Preview State
+  const [previewDocument, setPreviewDocument] = useState(null);
+  const [previewFileData, setPreviewFileData] = useState(null);
+
+  // Document Delete Confirmation State
+  const [deleteDocumentConfirm, setDeleteDocumentConfirm] = useState({
+    isOpen: false,
+    document: null
+  });
 
   const itemsPerPage = 10;
   const searchTimeoutRef = useRef(null);
@@ -384,15 +402,71 @@ export default function Inventory() {
       );
 
       if (response.success) {
+        const motorId = response.data.id;
+
+        // Upload documents if any
+        if (uploadedFiles.length > 0) {
+          let uploadedCount = 0;
+          let failedCount = 0;
+
+          for (const fileItem of uploadedFiles) {
+            try {
+              // Read file as base64
+              const reader = new FileReader();
+              const fileDataBase64 = await new Promise((resolve, reject) => {
+                reader.onload = () => {
+                  const base64 = reader.result.split(',')[1]; // Remove data:...;base64, prefix
+                  resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(fileItem.file);
+              });
+
+              // Upload document
+              const uploadResponse = await UploadMotorDocument(
+                motorId,
+                fileItem.documentType,
+                fileItem.name,
+                fileDataBase64
+              );
+
+              if (uploadResponse.success) {
+                uploadedCount++;
+              } else {
+                failedCount++;
+                console.error('Failed to upload document:', uploadResponse.message);
+              }
+            } catch (uploadError) {
+              failedCount++;
+              console.error('Error uploading document:', uploadError);
+            }
+          }
+
+          // Show result message
+          let message = `Motor ${formData.nama_motor} berhasil ditambahkan!`;
+          if (uploadedCount > 0) {
+            message += ` ${uploadedCount} dokumen berhasil diupload.`;
+          }
+          if (failedCount > 0) {
+            message += ` ${failedCount} dokumen gagal diupload.`;
+          }
+
+          setAlertModal({
+            isOpen: true,
+            type: failedCount > 0 ? 'warning' : 'success',
+            message: message
+          });
+        } else {
+          setAlertModal({
+            isOpen: true,
+            type: 'success',
+            message: `Motor ${formData.nama_motor} berhasil ditambahkan!`
+          });
+        }
+
         setShowModal(false);
         resetForm();
         loadMotors();
-        // Show success alert
-        setAlertModal({
-          isOpen: true,
-          type: 'success',
-          message: `Motor ${formData.nama_motor} berhasil ditambahkan!`
-        });
       } else {
         setAlertModal({
           isOpen: true,
@@ -444,15 +518,69 @@ export default function Inventory() {
       );
 
       if (response.success) {
+        // Upload new documents if any
+        if (uploadedFiles.length > 0) {
+          let uploadedCount = 0;
+          let failedCount = 0;
+
+          for (const fileItem of uploadedFiles) {
+            try {
+              // Read file as base64
+              const reader = new FileReader();
+              const fileDataBase64 = await new Promise((resolve, reject) => {
+                reader.onload = () => {
+                  const base64 = reader.result.split(',')[1];
+                  resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(fileItem.file);
+              });
+
+              // Upload document
+              const uploadResponse = await UploadMotorDocument(
+                editingMotor.id,
+                fileItem.documentType,
+                fileItem.name,
+                fileDataBase64
+              );
+
+              if (uploadResponse.success) {
+                uploadedCount++;
+              } else {
+                failedCount++;
+                console.error('Failed to upload document:', uploadResponse.message);
+              }
+            } catch (uploadError) {
+              failedCount++;
+              console.error('Error uploading document:', uploadError);
+            }
+          }
+
+          // Show result message
+          let message = `Motor ${formData.nama_motor} berhasil diupdate!`;
+          if (uploadedCount > 0) {
+            message += ` ${uploadedCount} dokumen baru berhasil diupload.`;
+          }
+          if (failedCount > 0) {
+            message += ` ${failedCount} dokumen gagal diupload.`;
+          }
+
+          setAlertModal({
+            isOpen: true,
+            type: failedCount > 0 ? 'warning' : 'success',
+            message: message
+          });
+        } else {
+          setAlertModal({
+            isOpen: true,
+            type: 'success',
+            message: `Motor ${formData.nama_motor} berhasil diupdate!`
+          });
+        }
+
         setShowModal(false);
         resetForm();
         loadMotors();
-        // Show success alert
-        setAlertModal({
-          isOpen: true,
-          type: 'success',
-          message: `Motor ${formData.nama_motor} berhasil diupdate!`
-        });
       } else {
         setAlertModal({
           isOpen: true,
@@ -519,6 +647,8 @@ export default function Inventory() {
     setEditingMotor(null);
     setNomorPolisiError('');
     setCheckingNomorPolisi(false);
+    setUploadedFiles([]);
+    setExistingDocuments([]);
 
     // Clear any pending timeouts
     if (nomorPolisiTimeoutRef.current) {
@@ -531,7 +661,7 @@ export default function Inventory() {
     setShowModal(true);
   };
 
-  const openEditModal = (motor) => {
+  const openEditModal = async (motor) => {
     setEditingMotor(motor);
     setFormData({
       nama_motor: motor.nama_motor,
@@ -548,7 +678,93 @@ export default function Inventory() {
       tanggal_masuk: formatTanggal(motor.tanggal_masuk),
       tanggal_keluar: formatTanggal(motor.tanggal_keluar) !== '-' ? formatTanggal(motor.tanggal_keluar) : '',
     });
+
+    // Load existing documents
+    await loadMotorDocuments(motor.id);
+
     setShowModal(true);
+  };
+
+  const loadMotorDocuments = async (motorId) => {
+    try {
+      setLoadingDocuments(true);
+      const response = await GetMotorDocuments(motorId);
+      if (response.success) {
+        setExistingDocuments(response.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading documents:', error);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  const handleDeleteDocument = async (doc) => {
+    setDeleteDocumentConfirm({
+      isOpen: true,
+      document: doc
+    });
+  };
+
+  const confirmDeleteDocument = async () => {
+    const doc = deleteDocumentConfirm.document;
+    if (!doc) return;
+
+    try {
+      const response = await DeleteMotorDocument(doc.id);
+      if (response.success) {
+        // Reload documents
+        await loadMotorDocuments(editingMotor.id);
+        setAlertModal({
+          isOpen: true,
+          type: 'success',
+          message: 'Dokumen berhasil dihapus!'
+        });
+      } else {
+        setAlertModal({
+          isOpen: true,
+          type: 'error',
+          message: response.message || 'Gagal menghapus dokumen'
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      setAlertModal({
+        isOpen: true,
+        type: 'error',
+        message: 'Terjadi kesalahan saat menghapus dokumen'
+      });
+    } finally {
+      setDeleteDocumentConfirm({ isOpen: false, document: null });
+    }
+  };
+
+  const handleDocumentClick = async (doc) => {
+    try {
+      const response = await GetMotorDocumentFile(doc.id);
+      if (response.success) {
+        setPreviewDocument(response.data.document);
+        setPreviewFileData(response.data.file_data);
+      } else {
+        setAlertModal({
+          isOpen: true,
+          type: 'error',
+          message: 'Gagal memuat dokumen'
+        });
+      }
+    } catch (error) {
+      console.error('Error loading document file:', error);
+      setAlertModal({
+        isOpen: true,
+        type: 'error',
+        message: 'Terjadi kesalahan saat memuat dokumen'
+      });
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewDocument(null);
+    setPreviewFileData(null);
   };
 
   // Smart Pagination Logic
@@ -786,9 +1002,8 @@ export default function Inventory() {
                   return (
                     <tr
                       key={motor.id}
-                      className={`inventory-table-body-row ${
-                        isAlternate ? 'inventory-table-body-row-alternate' : ''
-                      }`}
+                      className={`inventory-table-body-row ${isAlternate ? 'inventory-table-body-row-alternate' : ''
+                        }`}
                     >
                       <td className="inventory-table-td inventory-table-td-no inventory-table-td-muted">{rowNumber}</td>
                       <td className="inventory-table-td inventory-table-td-primary">{motor.nama_motor}</td>
@@ -1089,6 +1304,55 @@ export default function Inventory() {
                 />
               </div>
 
+              {/* Document Management - Only for Edit Motor */}
+              {editingMotor && (
+                <div className="inventory-form-section">
+                  <h3 className="inventory-form-section-title">📄 Kelola Dokumen Motor</h3>
+
+                  {/* Existing Documents */}
+                  {loadingDocuments ? (
+                    <div style={{ textAlign: 'center', padding: '20px' }}>
+                      <p>Memuat dokumen...</p>
+                    </div>
+                  ) : existingDocuments.length > 0 ? (
+                    <div style={{ marginBottom: '20px' }}>
+                      <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: '#344F1F' }}>
+                        Dokumen Existing ({existingDocuments.length})
+                      </h4>
+                      <DocumentList
+                        documents={existingDocuments}
+                        onDocumentClick={handleDocumentClick}
+                        onDocumentDelete={handleDeleteDocument}
+                        editable={true}
+                      />
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '20px', backgroundColor: '#f9fafb', borderRadius: '8px', marginBottom: '20px' }}>
+                      <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>Belum ada dokumen</p>
+                    </div>
+                  )}
+
+                  {/* Upload New Documents */}
+                  <div>
+                    <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: '#344F1F' }}>
+                      Upload Dokumen Baru
+                    </h4>
+                    <DocumentUploader
+                      onFilesChange={setUploadedFiles}
+                      maxFiles={10 - existingDocuments.length}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Document Upload - Only for Add Motor */}
+              {!editingMotor && (
+                <DocumentUploader
+                  onFilesChange={setUploadedFiles}
+                  maxFiles={10}
+                />
+              )}
+
               <div className="inventory-form-buttons">
                 <button
                   type="button"
@@ -1125,6 +1389,26 @@ export default function Inventory() {
         onConfirm={confirmModal.onConfirm}
         message={confirmModal.message}
         title="Konfirmasi Hapus"
+        confirmText="Hapus"
+        type="danger"
+      />
+
+      {/* Document Preview Modal */}
+      {previewDocument && previewFileData && (
+        <DocumentPreview
+          document={previewDocument}
+          fileData={previewFileData}
+          onClose={closePreview}
+        />
+      )}
+
+      {/* Document Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteDocumentConfirm.isOpen}
+        onClose={() => setDeleteDocumentConfirm({ isOpen: false, document: null })}
+        onConfirm={confirmDeleteDocument}
+        message={`Apakah Anda yakin ingin menghapus dokumen "${deleteDocumentConfirm.document?.file_name}"?`}
+        title="Konfirmasi Hapus Dokumen"
         confirmText="Hapus"
         type="danger"
       />

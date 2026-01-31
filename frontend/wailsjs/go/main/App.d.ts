@@ -8,9 +8,17 @@ export function AddMotor(arg1:string,arg2:string,arg3:string,arg4:number,arg5:nu
 
 export function CheckNomorPolisiExists(arg1:string,arg2:string):Promise<main.Response>;
 
+export function CleanupMotorDocuments(arg1:string):Promise<void>;
+
 export function CreateTransaction(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number,arg6:string):Promise<main.Response>;
 
 export function DeleteMotor(arg1:string):Promise<main.Response>;
+
+export function DeleteMotorDocument(arg1:string):Promise<main.Response>;
+
+export function EnsureDocumentsFolder():Promise<void>;
+
+export function EnsureMotorFolder(arg1:string):Promise<void>;
 
 export function GetAvailableMotorsForSale():Promise<main.Response>;
 
@@ -20,9 +28,19 @@ export function GetCapitalTransactions():Promise<main.Response>;
 
 export function GetCurrentCapital():Promise<main.Response>;
 
+export function GetDocumentsBasePath():Promise<string>;
+
 export function GetFinancialSummary():Promise<main.Response>;
 
+export function GetFinancialSummaryByYear(arg1:string):Promise<main.Response>;
+
 export function GetMotorByID(arg1:string):Promise<main.Response>;
+
+export function GetMotorDocumentFile(arg1:string):Promise<main.Response>;
+
+export function GetMotorDocuments(arg1:string):Promise<main.Response>;
+
+export function GetMotorDocumentsPath(arg1:string):Promise<string>;
 
 export function GetMotors():Promise<main.Response>;
 
@@ -42,10 +60,10 @@ export function SearchMotors(arg1:string):Promise<main.Response>;
 
 export function SearchTransactions(arg1:string,arg2:string,arg3:string):Promise<main.Response>;
 
-export function SeedData2025():Promise<main.Response>;
-
 export function SubtractCapital(arg1:number,arg2:string):Promise<main.Response>;
 
 export function UpdateMotor(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number,arg6:number,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string,arg12:string,arg13:string,arg14:string):Promise<main.Response>;
 
 export function UpdateMotorStatus(arg1:string,arg2:string):Promise<main.Response>;
+
+export function UploadMotorDocument(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.Response>;

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Calendar, DollarSign, Info, TrendingUp, Package, FileText, Clock, User, Phone, MapPin } from 'lucide-react';
-import { GetMotorByID } from '../../wailsjs/go/main/App';
+import { GetMotorByID, GetMotorDocuments, GetMotorDocumentFile, DeleteMotorDocument } from '../../wailsjs/go/main/App';
+import DocumentList from './DocumentList';
+import DocumentPreview from './DocumentPreview';
 import './MotorDetail.css';
 
 const formatCurrency = (value) => {
@@ -27,9 +29,14 @@ const STATUS_CONFIG = {
 export default function MotorDetail({ motorId, onBack }) {
   const [motor, setMotor] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [documents, setDocuments] = useState([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState(null);
+  const [previewFileData, setPreviewFileData] = useState(null);
 
   useEffect(() => {
     loadMotorDetail();
+    loadDocuments();
   }, [motorId]);
 
   const loadMotorDetail = async () => {
@@ -44,6 +51,37 @@ export default function MotorDetail({ motorId, onBack }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadDocuments = async () => {
+    try {
+      setLoadingDocuments(true);
+      const response = await GetMotorDocuments(motorId);
+      if (response.success) {
+        setDocuments(response.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading documents:', error);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  const handleDocumentClick = async (doc) => {
+    try {
+      const response = await GetMotorDocumentFile(doc.id);
+      if (response.success) {
+        setPreviewDocument(response.data.document);
+        setPreviewFileData(response.data.file_data);
+      }
+    } catch (error) {
+      console.error('Error loading document file:', error);
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewDocument(null);
+    setPreviewFileData(null);
   };
 
   if (loading) {
@@ -248,6 +286,28 @@ export default function MotorDetail({ motorId, onBack }) {
           </div>
         </div>
 
+        {/* Dokumen Motor */}
+        <div className="detail-section full-width">
+          <div className="section-header">
+            <FileText size={20} />
+            <h2>Dokumen Motor</h2>
+          </div>
+
+          <div className="detail-card">
+            {loadingDocuments ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <p>Memuat dokumen...</p>
+              </div>
+            ) : (
+              <DocumentList
+                documents={documents}
+                onDocumentClick={handleDocumentClick}
+                editable={false}
+              />
+            )}
+          </div>
+        </div>
+
         {/* Informasi Sistem */}
         <div className="detail-section full-width">
           <div className="section-header">
@@ -273,6 +333,15 @@ export default function MotorDetail({ motorId, onBack }) {
           </div>
         </div>
       </div>
+
+      {/* Document Preview Modal - View Only */}
+      {previewDocument && previewFileData && (
+        <DocumentPreview
+          document={previewDocument}
+          fileData={previewFileData}
+          onClose={closePreview}
+        />
+      )}
     </div>
   );
 }

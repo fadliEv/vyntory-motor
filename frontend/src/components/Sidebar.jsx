@@ -53,7 +53,7 @@ export default function Sidebar({ currentPage, setCurrentPage, isOpen, onClose }
             <BarChart3 size={24} color="white" />
           </div>
           <div className="sidebar-logo-text">
-            <h1>Cupet Motor</h1>
+            <h1>Vyntory Motor</h1>
             <p>Dealer Management</p>
           </div>
         </div>

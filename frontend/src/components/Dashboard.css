@@ -6,9 +6,9 @@
   position: relative;
 }
 
-/* Watermark - Licensed to Cupet Motor */
+/* Watermark - Licensed to Vyntory Motor */
 .dashboard-container::before {
-  content: 'LICENSED TO: CUPET MOTOR';
+  content: 'LICENSED TO: VYNTORY MOTOR';
   position: fixed;
   top: 50%;
   left: 50%;
@@ -24,7 +24,7 @@
 }
 
 .dashboard-container::after {
-  content: 'CUPET MOTOR';
+  content: 'VYNTORY MOTOR';
   position: fixed;
   bottom: 20px;
   right: 30px;
