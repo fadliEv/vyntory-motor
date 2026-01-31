@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { LogIn, User, Lock, AlertCircle } from 'lucide-react';
+import { Login as LoginAPI } from '../../wailsjs/go/main/App';
 import './Login.css';
 
 export default function Login({ onLoginSuccess, onNavigate }) {
@@ -20,28 +21,25 @@ export default function Login({ onLoginSuccess, onNavigate }) {
         setLoading(true);
 
         try {
-            // Simulate login - replace with actual API call
-            // const response = await Login(username, password);
+            // Call real Login API
+            const response = await LoginAPI(username, password);
 
-            // For now, accept any credentials and create mock session
-            const mockUser = {
-                id: 'USR-1',
-                username: username,
-                fullName: 'Demo User',
-                role: 'owner',
-                email: 'demo@example.com'
-            };
+            if (!response.success) {
+                setError(response.message || 'Login gagal. Silakan coba lagi.');
+                setLoading(false);
+                return;
+            }
 
-            const mockSessionToken = 'mock-session-' + Date.now();
-
-            // Save to localStorage
-            localStorage.setItem('sessionToken', mockSessionToken);
-            localStorage.setItem('user', JSON.stringify(mockUser));
+            // Save session token and user to localStorage
+            const { token, user } = response.data;
+            localStorage.setItem('sessionToken', token);
+            localStorage.setItem('user', JSON.stringify(user));
 
             // Call success callback
-            onLoginSuccess(mockUser);
+            onLoginSuccess(user);
 
         } catch (err) {
+            console.error('Login error:', err);
             setError('Login gagal. Silakan coba lagi.');
         } finally {
             setLoading(false);

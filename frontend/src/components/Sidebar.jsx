@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BarChart3, Package, FileText, Settings, Home, LogOut, TrendingUp, DollarSign, ChevronDown, ChevronUp, History, Wallet, ShoppingCart } from 'lucide-react';
+import { Logout as LogoutAPI } from '../../wailsjs/go/main/App';
 import './Sidebar.css';
 
 export default function Sidebar({ currentPage, setCurrentPage, isOpen, onClose }) {
@@ -44,13 +45,29 @@ export default function Sidebar({ currentPage, setCurrentPage, isOpen, onClose }
     }
   };
 
-  const handleLogout = () => {
-    // Clear session from localStorage
-    localStorage.removeItem('sessionToken');
-    localStorage.removeItem('user');
+  const handleLogout = async () => {
+    try {
+      // Get session token
+      const sessionToken = localStorage.getItem('sessionToken');
 
-    // Reload page to redirect to login
-    window.location.reload();
+      if (sessionToken) {
+        // Call real Logout API
+        await LogoutAPI(sessionToken);
+      }
+
+      // Clear session from localStorage
+      localStorage.removeItem('sessionToken');
+      localStorage.removeItem('user');
+
+      // Reload page to redirect to login
+      window.location.reload();
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even if API fails, clear local storage and reload
+      localStorage.removeItem('sessionToken');
+      localStorage.removeItem('user');
+      window.location.reload();
+    }
   };
 
   return (
