@@ -6,6 +6,22 @@ import './Sidebar.css';
 export default function Sidebar({ currentPage, setCurrentPage, isOpen, onClose }) {
   const [expandedMenus, setExpandedMenus] = useState({ keuangan: true }); // Keuangan menu expanded by default
 
+  // Get user role from localStorage
+  const getUserRole = () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        return user.role;
+      }
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+    }
+    return null;
+  };
+
+  const userRole = getUserRole();
+
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'inventory', label: 'Inventory Motor', icon: Package },
@@ -15,9 +31,9 @@ export default function Sidebar({ currentPage, setCurrentPage, isOpen, onClose }
       icon: DollarSign,
       isExpandable: true,
       subItems: [
-        { id: 'data-modal', label: 'Data Modal', icon: Wallet },
-        { id: 'history-keuangan', label: 'History Keuangan', icon: History },
-        { id: 'reports', label: 'Laporan Keuangan', icon: FileText },
+        { id: 'data-modal', label: 'Data Modal', icon: Wallet, ownerOnly: true }, // Owner only
+        { id: 'history-keuangan', label: 'History Keuangan', icon: History, ownerOnly: true }, // Owner only
+        { id: 'reports', label: 'Laporan Keuangan', icon: FileText, ownerOnly: true }, // Owner only
       ]
     },
     {
@@ -31,6 +47,33 @@ export default function Sidebar({ currentPage, setCurrentPage, isOpen, onClose }
       ]
     },
   ];
+
+  // Filter menu items based on user role
+  const getFilteredMenuItems = () => {
+    if (userRole === 'owner') {
+      return menuItems; // Owner sees all menus
+    }
+
+    // Karyawan: filter out owner-only items
+    return menuItems.map(item => {
+      if (item.isExpandable && item.subItems) {
+        const filteredSubItems = item.subItems.filter(subItem => !subItem.ownerOnly);
+
+        // If all subitems are filtered out, hide the parent menu
+        if (filteredSubItems.length === 0) {
+          return null;
+        }
+
+        return {
+          ...item,
+          subItems: filteredSubItems
+        };
+      }
+      return item;
+    }).filter(item => item !== null);
+  };
+
+  const filteredMenuItems = getFilteredMenuItems();
 
   const handleMenuClick = (pageId, isExpandable) => {
     if (isExpandable) {
@@ -88,7 +131,7 @@ export default function Sidebar({ currentPage, setCurrentPage, isOpen, onClose }
       {/* Menu Items */}
       <nav className="sidebar-nav">
         <div className="sidebar-menu">
-          {menuItems.map((item) => {
+          {filteredMenuItems.map((item) => {
             const IconComponent = item.icon;
             const isActive = currentPage === item.id;
             const isExpanded = expandedMenus[item.id];
