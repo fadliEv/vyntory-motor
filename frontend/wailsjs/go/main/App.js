@@ -14,8 +14,24 @@ export function CheckNomorPolisiExists(arg1, arg2) {
   return window['go']['main']['App']['CheckNomorPolisiExists'](arg1, arg2);
 }
 
+export function CheckPermission(arg1, arg2) {
+  return window['go']['main']['App']['CheckPermission'](arg1, arg2);
+}
+
+export function CleanupExpiredSessions() {
+  return window['go']['main']['App']['CleanupExpiredSessions']();
+}
+
 export function CleanupMotorDocuments(arg1) {
   return window['go']['main']['App']['CleanupMotorDocuments'](arg1);
+}
+
+export function CreateSession(arg1) {
+  return window['go']['main']['App']['CreateSession'](arg1);
+}
+
+export function CreateSessionsTable() {
+  return window['go']['main']['App']['CreateSessionsTable']();
 }
 
 export function CreateTransaction(arg1, arg2, arg3, arg4, arg5, arg6) {
@@ -56,6 +72,10 @@ export function GetCapitalTransactions() {
 
 export function GetCurrentCapital() {
   return window['go']['main']['App']['GetCurrentCapital']();
+}
+
+export function GetCurrentUser(arg1) {
+  return window['go']['main']['App']['GetCurrentUser'](arg1);
 }
 
 export function GetDocumentsBasePath() {
@@ -114,8 +134,28 @@ export function GetTransactions() {
   return window['go']['main']['App']['GetTransactions']();
 }
 
+export function GetUserByID(arg1) {
+  return window['go']['main']['App']['GetUserByID'](arg1);
+}
+
 export function GetUserByUsername(arg1) {
   return window['go']['main']['App']['GetUserByUsername'](arg1);
+}
+
+export function InvalidateSession(arg1) {
+  return window['go']['main']['App']['InvalidateSession'](arg1);
+}
+
+export function Login(arg1, arg2) {
+  return window['go']['main']['App']['Login'](arg1, arg2);
+}
+
+export function Logout(arg1) {
+  return window['go']['main']['App']['Logout'](arg1);
+}
+
+export function RequirePermission(arg1, arg2) {
+  return window['go']['main']['App']['RequirePermission'](arg1, arg2);
 }
 
 export function SearchMotors(arg1) {
@@ -148,4 +188,8 @@ export function UpdateMotorStatus(arg1, arg2) {
 
 export function UploadMotorDocument(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['UploadMotorDocument'](arg1, arg2, arg3, arg4);
+}
+
+export function ValidateSession(arg1) {
+  return window['go']['main']['App']['ValidateSession'](arg1);
 }

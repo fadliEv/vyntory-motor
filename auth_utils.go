@@ -176,6 +176,43 @@ func (a *App) GetUserByUsername(username string) (*User, error) {
 	return &user, nil
 }
 
+// GetUserByID retrieves a user by ID
+func (a *App) GetUserByID(userID string) (*User, error) {
+	var user User
+	query := `
+		SELECT id, username, email, password_hash, full_name, role, status, created_at, updated_at, last_login
+		FROM users
+		WHERE id = ?
+	`
+
+	var lastLogin sql.NullTime
+	err := a.db.QueryRow(query, userID).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.PasswordHash,
+		&user.FullName,
+		&user.Role,
+		&user.Status,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&lastLogin,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("user not found")
+		}
+		return nil, err
+	}
+
+	if lastLogin.Valid {
+		user.LastLogin = &lastLogin.Time
+	}
+
+	return &user, nil
+}
+
 // UpdateLastLogin updates the last login timestamp for a user
 func (a *App) UpdateLastLogin(userID string) error {
 	query := `UPDATE users SET last_login = ? WHERE id = ?`

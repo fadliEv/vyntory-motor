@@ -396,6 +396,13 @@ func (a *App) initDatabase() error {
 		return err
 	}
 
+	// Create sessions table
+	err = a.CreateSessionsTable()
+	if err != nil {
+		fmt.Printf("❌ Error creating sessions table: %v\n", err)
+		return err
+	}
+
 	err = a.SeedUsers()
 	if err != nil {
 		fmt.Printf("❌ Error seeding users: %v\n", err)

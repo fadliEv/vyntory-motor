@@ -8,7 +8,15 @@ export function AddMotor(arg1:string,arg2:string,arg3:string,arg4:number,arg5:nu
 
 export function CheckNomorPolisiExists(arg1:string,arg2:string):Promise<main.Response>;
 
+export function CheckPermission(arg1:string,arg2:string):Promise<boolean>;
+
+export function CleanupExpiredSessions():Promise<void>;
+
 export function CleanupMotorDocuments(arg1:string):Promise<void>;
+
+export function CreateSession(arg1:string):Promise<string>;
+
+export function CreateSessionsTable():Promise<void>;
 
 export function CreateTransaction(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number,arg6:string):Promise<main.Response>;
 
@@ -29,6 +37,8 @@ export function GetAvailableYears():Promise<main.Response>;
 export function GetCapitalTransactions():Promise<main.Response>;
 
 export function GetCurrentCapital():Promise<main.Response>;
+
+export function GetCurrentUser(arg1:string):Promise<main.Response>;
 
 export function GetDocumentsBasePath():Promise<string>;
 
@@ -58,7 +68,17 @@ export function GetTodayStats():Promise<main.Response>;
 
 export function GetTransactions():Promise<main.Response>;
 
+export function GetUserByID(arg1:string):Promise<main.User>;
+
 export function GetUserByUsername(arg1:string):Promise<main.User>;
+
+export function InvalidateSession(arg1:string):Promise<void>;
+
+export function Login(arg1:string,arg2:string):Promise<main.Response>;
+
+export function Logout(arg1:string):Promise<main.Response>;
+
+export function RequirePermission(arg1:string,arg2:string):Promise<void>;
 
 export function SearchMotors(arg1:string):Promise<main.Response>;
 
@@ -75,3 +95,5 @@ export function UpdateMotor(arg1:string,arg2:string,arg3:string,arg4:string,arg5
 export function UpdateMotorStatus(arg1:string,arg2:string):Promise<main.Response>;
 
 export function UploadMotorDocument(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.Response>;
+
+export function ValidateSession(arg1:string):Promise<main.User>;
