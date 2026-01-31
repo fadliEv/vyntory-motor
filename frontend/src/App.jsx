@@ -9,12 +9,16 @@ import DataModal from './components/DataModal';
 import HistoryKeuangan from './components/HistoryKeuangan';
 import TransactionCreate from './components/TransactionCreate';
 import TransactionHistory from './components/TransactionHistory';
+import Login from './components/Login';
 
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [wailsReady, setWailsReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     // Wait for Wails runtime to be ready
@@ -26,7 +30,30 @@ function App() {
       }
     };
     checkWails();
+
+    // Check authentication from localStorage
+    const sessionToken = localStorage.getItem('sessionToken');
+    const storedUser = localStorage.getItem('user');
+
+    if (sessionToken && storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error('Failed to parse user data:', error);
+        localStorage.removeItem('sessionToken');
+        localStorage.removeItem('user');
+      }
+    }
+
+    setAuthChecked(true);
   }, []);
+
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
+    setIsAuthenticated(true);
+  };
 
   const renderPage = () => {
     if (!wailsReady) {
@@ -57,6 +84,28 @@ function App() {
     }
   };
 
+  // Show loading while checking auth
+  if (!authChecked) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: 'linear-gradient(135deg, #344F1F 0%, #5a7a3c 100%)',
+        color: '#ffffff'
+      }}>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // Show main app if authenticated
   return (
     <div className="app-container">
       <Sidebar
