@@ -22,6 +22,10 @@ export function CreateTransaction(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['App']['CreateTransaction'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
+export function CreateUsersTable() {
+  return window['go']['main']['App']['CreateUsersTable']();
+}
+
 export function DeleteMotor(arg1) {
   return window['go']['main']['App']['DeleteMotor'](arg1);
 }
@@ -110,6 +114,10 @@ export function GetTransactions() {
   return window['go']['main']['App']['GetTransactions']();
 }
 
+export function GetUserByUsername(arg1) {
+  return window['go']['main']['App']['GetUserByUsername'](arg1);
+}
+
 export function SearchMotors(arg1) {
   return window['go']['main']['App']['SearchMotors'](arg1);
 }
@@ -118,8 +126,16 @@ export function SearchTransactions(arg1, arg2, arg3) {
   return window['go']['main']['App']['SearchTransactions'](arg1, arg2, arg3);
 }
 
+export function SeedUsers() {
+  return window['go']['main']['App']['SeedUsers']();
+}
+
 export function SubtractCapital(arg1, arg2) {
   return window['go']['main']['App']['SubtractCapital'](arg1, arg2);
+}
+
+export function UpdateLastLogin(arg1) {
+  return window['go']['main']['App']['UpdateLastLogin'](arg1);
 }
 
 export function UpdateMotor(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14) {

@@ -12,6 +12,8 @@ export function CleanupMotorDocuments(arg1:string):Promise<void>;
 
 export function CreateTransaction(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number,arg6:string):Promise<main.Response>;
 
+export function CreateUsersTable():Promise<void>;
+
 export function DeleteMotor(arg1:string):Promise<main.Response>;
 
 export function DeleteMotorDocument(arg1:string):Promise<main.Response>;
@@ -56,11 +58,17 @@ export function GetTodayStats():Promise<main.Response>;
 
 export function GetTransactions():Promise<main.Response>;
 
+export function GetUserByUsername(arg1:string):Promise<main.User>;
+
 export function SearchMotors(arg1:string):Promise<main.Response>;
 
 export function SearchTransactions(arg1:string,arg2:string,arg3:string):Promise<main.Response>;
 
+export function SeedUsers():Promise<void>;
+
 export function SubtractCapital(arg1:number,arg2:string):Promise<main.Response>;
+
+export function UpdateLastLogin(arg1:string):Promise<void>;
 
 export function UpdateMotor(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number,arg6:number,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string,arg12:string,arg13:string,arg14:string):Promise<main.Response>;
 

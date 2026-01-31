@@ -388,6 +388,20 @@ func (a *App) initDatabase() error {
 		fmt.Println("✅ Database sudah memiliki data, skip seeding")
 	}
 
+	// Create users table and seed default users
+	fmt.Println("👥 Setting up users table...")
+	err = a.CreateUsersTable()
+	if err != nil {
+		fmt.Printf("❌ Error creating users table: %v\n", err)
+		return err
+	}
+
+	err = a.SeedUsers()
+	if err != nil {
+		fmt.Printf("❌ Error seeding users: %v\n", err)
+		return err
+	}
+
 	return nil
 }
 
