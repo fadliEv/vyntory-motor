@@ -3,65 +3,12 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
-	"log"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 )
 
 // ==================== Document Management Helper Functions ====================
-
-// GetDocumentsBasePath returns the base path for documents storage
-// Path: {parent_dir}/vyntory-motor-documents/
-func (a *App) GetDocumentsBasePath() string {
-	wd, err := os.Getwd()
-	if err != nil {
-		log.Printf("Error getting working directory: %v", err)
-		return ""
-	}
-
-	// Go up one level from project folder
-	parentDir := filepath.Dir(wd)
-
-	// Documents folder sejajar dengan project
-	docsPath := filepath.Join(parentDir, "vyntory-motor-documents")
-
-	return docsPath
-}
-
-// GetMotorDocumentsPath returns the path for a specific motor's documents
-// Path: {base_path}/motors/{motor_id}/
-func (a *App) GetMotorDocumentsPath(motorID string) string {
-	basePath := a.GetDocumentsBasePath()
-	motorPath := filepath.Join(basePath, "motors", motorID)
-	return motorPath
-}
-
-// EnsureDocumentsFolder creates the documents folder structure if it doesn't exist
-func (a *App) EnsureDocumentsFolder() error {
-	basePath := a.GetDocumentsBasePath()
-	motorsPath := filepath.Join(basePath, "motors")
-
-	// Create motors folder
-	if err := os.MkdirAll(motorsPath, 0755); err != nil {
-		return fmt.Errorf("failed to create documents folder: %w", err)
-	}
-
-	fmt.Printf("📁 Documents folder ready: %s\n", basePath)
-	return nil
-}
-
-// EnsureMotorFolder creates a folder for a specific motor if it doesn't exist
-func (a *App) EnsureMotorFolder(motorID string) error {
-	motorPath := a.GetMotorDocumentsPath(motorID)
-
-	if err := os.MkdirAll(motorPath, 0755); err != nil {
-		return fmt.Errorf("failed to create motor folder: %w", err)
-	}
-
-	return nil
-}
 
 // ValidateDocumentType checks if document type is valid
 func ValidateDocumentType(docType string) bool {
