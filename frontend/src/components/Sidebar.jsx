@@ -44,6 +44,15 @@ export default function Sidebar({ currentPage, setCurrentPage, isOpen, onClose }
     }
   };
 
+  const handleLogout = () => {
+    // Clear session from localStorage
+    localStorage.removeItem('sessionToken');
+    localStorage.removeItem('user');
+
+    // Reload page to redirect to login
+    window.location.reload();
+  };
+
   return (
     <div className={`sidebar ${isOpen ? 'open' : 'closed'}`}>
       {/* Logo/Header */}
@@ -115,7 +124,7 @@ export default function Sidebar({ currentPage, setCurrentPage, isOpen, onClose }
           <Settings size={20} />
           <span>Pengaturan</span>
         </button>
-        <button className="sidebar-footer-btn logout">
+        <button className="sidebar-footer-btn logout" onClick={handleLogout}>
           <LogOut size={20} />
           <span>Keluar</span>
         </button>
