@@ -3,7 +3,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #344F1F 0%, #5a7a3c 100%);
+    background: linear-gradient(135deg, #4a5d3a 0%, #5f7349 100%);
     padding: 20px;
 }
 
@@ -19,7 +19,7 @@
 .login-header {
     padding: 40px 32px 32px;
     text-align: center;
-    background: linear-gradient(135deg, #344F1F 0%, #5a7a3c 100%);
+    background: linear-gradient(135deg, #4a5d3a 0%, #5f7349 100%);
     color: #ffffff;
 }
 
@@ -63,6 +63,20 @@
     margin-bottom: 24px;
 }
 
+.login-success {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 16px;
+    background-color: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    color: #16a34a;
+    font-size: 14px;
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
 .login-form-group {
     margin-bottom: 20px;
 }
@@ -100,8 +114,8 @@
 
 .login-input-wrapper input:focus {
     outline: none;
-    border-color: #344F1F;
-    box-shadow: 0 0 0 3px rgba(52, 79, 31, 0.1);
+    border-color: #4a5d3a;
+    box-shadow: 0 0 0 3px rgba(74, 93, 58, 0.1);
 }
 
 .login-input-wrapper input:disabled {
@@ -109,10 +123,32 @@
     cursor: not-allowed;
 }
 
+.login-forgot {
+    text-align: right;
+    margin-bottom: 20px;
+}
+
+.login-link {
+    background: none;
+    border: none;
+    color: #4a5d3a;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.login-link:hover {
+    color: #5f7349;
+    text-decoration: underline;
+}
+
 .login-btn {
     width: 100%;
     padding: 14px;
-    background: linear-gradient(135deg, #344F1F 0%, #5a7a3c 100%);
+    background: linear-gradient(135deg, #4a5d3a 0%, #5f7349 100%);
     color: #ffffff;
     border: none;
     border-radius: 8px;
@@ -125,7 +161,7 @@
 
 .login-btn:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(52, 79, 31, 0.3);
+    box-shadow: 0 8px 16px rgba(74, 93, 58, 0.3);
 }
 
 .login-btn:active:not(:disabled) {
@@ -135,6 +171,17 @@
 .login-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+}
+
+.login-register {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 14px;
+    color: #6b7280;
+}
+
+.login-register span {
+    margin-right: 4px;
 }
 
 .login-footer {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { LogIn, User, Lock, AlertCircle } from 'lucide-react';
 import './Login.css';
 
-export default function Login({ onLoginSuccess }) {
+export default function Login({ onLoginSuccess, onNavigate }) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -97,6 +97,16 @@ export default function Login({ onLoginSuccess }) {
                         </div>
                     </div>
 
+                    <div className="login-forgot">
+                        <button
+                            type="button"
+                            className="login-link"
+                            onClick={() => onNavigate && onNavigate('forgot-password')}
+                        >
+                            Lupa password?
+                        </button>
+                    </div>
+
                     <button
                         type="submit"
                         className="login-btn"
@@ -104,6 +114,17 @@ export default function Login({ onLoginSuccess }) {
                     >
                         {loading ? 'Memproses...' : 'Masuk'}
                     </button>
+
+                    <div className="login-register">
+                        <span>Belum punya akun? </span>
+                        <button
+                            type="button"
+                            className="login-link"
+                            onClick={() => onNavigate && onNavigate('register')}
+                        >
+                            Daftar sekarang
+                        </button>
+                    </div>
                 </form>
 
                 <div className="login-footer">

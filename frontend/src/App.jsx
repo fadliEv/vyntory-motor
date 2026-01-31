@@ -10,6 +10,8 @@ import HistoryKeuangan from './components/HistoryKeuangan';
 import TransactionCreate from './components/TransactionCreate';
 import TransactionHistory from './components/TransactionHistory';
 import Login from './components/Login';
+import Register from './components/Register';
+import ForgotPassword from './components/ForgotPassword';
 
 
 function App() {
@@ -19,6 +21,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [authPage, setAuthPage] = useState('login'); // 'login', 'register', 'forgot-password'
 
   useEffect(() => {
     // Wait for Wails runtime to be ready
